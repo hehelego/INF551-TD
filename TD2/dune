@@ -1,5 +1,10 @@
 (library
   (name td2)
+  (modules sat)
   (inline_tests)
   (preprocess (pps ppx_inline_test)))
 
+(executable
+  (name solve)
+  (libraries td2)
+  (modules parser solve))
