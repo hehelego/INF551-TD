@@ -155,18 +155,17 @@ let%test_unit "unitary-clause" =
 + either occurs in xs but not in ys
 + or occurs in ys but not in xs
 *)
-let rec head_xor xs ys =
-  match (xs, ys) with
-  | [], [] ->
-      None
-  | x :: _xs, [] ->
+let head_xor xs ys =
+  let not_in xs x = not (List.mem x xs) in
+  match List.find_opt (not_in ys) xs with
+  | Some x ->
       Some (true, x)
-  | [], y :: _ys ->
-      Some (false, y)
-  | x :: xs, y :: ys when x = y ->
-      head_xor xs ys
-  | x :: _xs, _y :: _ys ->
-      Some (true, x)
+  | None -> (
+    match List.find_opt (not_in xs) ys with
+    | Some y ->
+        Some (false, y)
+    | None ->
+        None )
 
 let%test_unit "head_xor" =
   assert (head_xor [] [] = None) ;
@@ -199,6 +198,7 @@ let%test_unit "pure-literal" =
   let y = (true, 1) in
   let y' = (false, 1) in
   assert (find_pure [[x; y]; [x]; [x'; y]] = Some y) ;
+  assert (find_pure [[x; y']; [x]; [x'; y']] = Some y') ;
   assert (find_pure [[x; y']; [x]; [x'; y]] = None)
 
 (** DPLL SAT solving:
@@ -226,7 +226,7 @@ let rec dpll cnf =
           let _polar, var =
             cnf |> List.hd (* 1st clause *) |> List.hd (* 1st literal *)
           in
-          let test value = subst_cnf var value cnf |> dpll_simple in
+          let test value = subst_cnf var value cnf |> dpll in
           test true || test false )
 
 let%test_unit "dpll" =
@@ -238,4 +238,3 @@ let%test_unit "dpll" =
   let b = [[x; y]; [x'; y]; [x; y']; [x'; y']] in
   assert (dpll a) ;
   assert (not (dpll b))
-
