@@ -205,29 +205,42 @@ let%test_unit "pure-literal" =
 
 + unit propagation
 + pure elimination
+
+The search procedure will leverage [pick_var] to find a variable to split on.
+[pick_var] will be supplied with a CNF that contains no empty clause.
  *)
-let rec dpll cnf =
-  if cnf = [] then (* no more clauses to satisfy *)
-    true
-  else if List.mem [] cnf then (* one clause is unsatisfiable *)
-    false
-  else
-    match find_unitary cnf with
-    | Some (v, x) ->
-        (* the value of [x] must be [v] *)
-        cnf |> subst_cnf x v |> dpll
-    | None -> (
-      match find_pure cnf with
+let dpll_with_heuristic (pick_var : cnf -> var) =
+  let rec dpll cnf =
+    if cnf = [] then (* no more clauses to satisfy *)
+      true
+    else if List.mem [] cnf then (* one clause is unsatisfiable *)
+      false
+    else
+      match find_unitary cnf with
       | Some (v, x) ->
-          (* safe to set [x] to [v] *)
+          (* the value of [x] must be [v] *)
           cnf |> subst_cnf x v |> dpll
-      | None ->
-          (* precondition: every disjunctive clause is non-empty *)
-          let _polar, var =
-            cnf |> List.hd (* 1st clause *) |> List.hd (* 1st literal *)
-          in
-          let test value = subst_cnf var value cnf |> dpll in
-          test true || test false )
+      | None -> (
+        match find_pure cnf with
+        | Some (v, x) ->
+            (* safe to set [x] to [v] *)
+            cnf |> subst_cnf x v |> dpll
+        | None ->
+            (* precondition: every disjunctive clause is non-empty *)
+            let var = pick_var cnf in
+            let test value = subst_cnf var value cnf |> dpll in
+            test true || test false )
+  in
+  dpll
+
+let dpll_first_var =
+  let pick_var cnf =
+    cnf |> List.hd (* 1st clause *) |> List.hd (* 1st literal *)
+    |> snd (* variable index *)
+  in
+  dpll_with_heuristic pick_var
+
+let dpll = dpll_first_var
 
 let%test_unit "dpll" =
   let x = (true, 0) in
