@@ -8,3 +8,8 @@
   (name solve)
   (libraries td2)
   (modules parser solve))
+
+(executable
+  (name sudoku)
+  (libraries td2)
+  (modules sudoku))
