@@ -331,3 +331,83 @@ let rec cnf_aux b = function
       else
         (* NOT (f OR g) = (NOT f) AND (NOT g) *)
         cnf_aux false f @ cnf_aux false g
+
+(** [tseitin f] is a CNF g,
+    such that f is SAT if and only if g is SAT.
+ *)
+let tseitin f =
+  let rec max_var = function
+    | True | False ->
+        -1
+    | Var v ->
+        v
+    | And (f, g) ->
+        max (max_var f) (max_var g)
+    | Or (f, g) ->
+        max (max_var f) (max_var g)
+    | Not f ->
+        max_var f
+  in
+  let cnt = ref (max_var f) in
+  let fresh () =
+    let x = !cnt + 1 in
+    cnt := x ;
+    x
+  in
+  let clauses = ref [] in
+  let append (c : clause) = clauses := c :: !clauses in
+  let rec transform f =
+    let z = fresh () in
+    ( match f with
+    | True ->
+        (* z <-> True
+           z
+        *)
+        append [(true, z)]
+    | False ->
+        (* z <-> False
+           z'
+        *)
+        append [(false, z)]
+    | Var x ->
+        (* z <-> x
+           (z -> x) AND (x -> z)
+           (z' OR x) AND (x' or z)
+        *)
+        append [(false, z); (true, x)] ;
+        append [(true, z); (false, x)]
+    | Not f ->
+        (* z <-> Not f
+           (z -> f') AND (f' -> z)
+           (z' OR f') AND (f OR z)
+        *)
+        let x = transform f in
+        append [(true, z); (true, x)] ;
+        append [(false, z); (false, x)]
+    | And (f, g) ->
+        (* z <-> f AND g
+           (z -> f AND g) AND (f AND g -> z)
+           (z -> f) AND (z -> g) AND (f' OR g' OR z)
+           (z' OR f) AND (z' OR g) AND (f' OR g' OR z)
+        *)
+        let x = transform f in
+        let y = transform g in
+        append [(false, z); (true, x)] ;
+        append [(false, z); (true, y)] ;
+        append [(true, z); (false, x); (false, y)]
+    | Or (f, g) ->
+        (* z <-> f OR g
+           (z -> f OR g) AND (f OR g -> z)
+           (z' OR f OR g) AND ((f' AND g') OR z)
+           (z' OR f OR g) AND (f' OR z) AND (g' OR z)
+        *)
+        let x = transform f in
+        let y = transform g in
+        append [(false, z); (true, x); (true, y)] ;
+        append [(false, x); (true, z)] ;
+        append [(false, y); (true, z)] ) ;
+    z
+  in
+  let x = transform f in
+  append [(true, x)] ;
+  !clauses
