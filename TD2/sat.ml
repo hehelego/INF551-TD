@@ -251,3 +251,83 @@ let%test_unit "dpll" =
   let b = [[x; y]; [x'; y]; [x; y']; [x'; y']] in
   assert (dpll a) ;
   assert (not (dpll b))
+
+(** [to_nnf] pushes negation inner by 
++ double negation elimination
++ 
+*)
+let rec to_nnf = function
+  | Not (Not f) ->
+      to_nnf f
+  | Not (And (f, g)) ->
+      Or (to_nnf (Not f), to_nnf (Not g))
+  | Not (Or (f, g)) ->
+      And (to_nnf (Not f), to_nnf (Not g))
+  | And (f, g) ->
+      And (to_nnf f, to_nnf g)
+  | Or (f, g) ->
+      Or (to_nnf f, to_nnf g)
+  | True ->
+      True
+  | False ->
+      False
+  | Var v ->
+      Var v
+  | Not True ->
+      False
+  | Not False ->
+      True
+  | Not (Var v) ->
+      Not (Var v)
+
+(** [cnf_disj ps qs] is the disjunction of two CNFs.
+    [(p1 & p2) | (q1 & q2) = (p1 | q1) & (p1 | q2) & (p2 | q1) & (p2 | q2)]
+    *)
+let cnf_disj ps qs = List.concat_map (fun p -> List.map (fun q -> p @ q) qs) ps
+
+exception NotInNNF of formula
+
+let cnf f =
+  let rec transform = function
+    | True ->
+        []
+    | False ->
+        [[]]
+    | Var v ->
+        [[(true, v)]]
+    | Not (Var v) ->
+        [[(false, v)]]
+    | And (f, g) ->
+        transform f @ transform g
+    | Or (f, g) ->
+        cnf_disj (transform f) (transform g)
+    | Not f ->
+        raise (NotInNNF (Not f))
+  in
+  to_nnf f |> transform
+
+(** [cnf_aux b f] is the CNF of
+    [f] when [b = true] or [Not f] when [b = False].
+*)
+let rec cnf_aux b = function
+  | True ->
+      if b then [] else [[]]
+  | False ->
+      if b then [[]] else []
+  | Var v ->
+      [[(b, v)]]
+  | Not f ->
+      cnf_aux (not b) f
+  | And (f, g) ->
+      if b then (* f AND g = cnf(f) AND cnf(g) *)
+        cnf_aux true f @ cnf_aux true g
+      else
+        (* NOT (f AND g) = (NOT f) OR (NOT g) *)
+        cnf_disj (cnf_aux false f) (cnf_aux false g)
+  | Or (f, g) ->
+      if b then
+        (* f OR g = cnf(f) OR cnf(g) *)
+        cnf_disj (cnf_aux true f) (cnf_aux true g)
+      else
+        (* NOT (f OR g) = (NOT f) AND (NOT g) *)
+        cnf_aux false f @ cnf_aux false g
