@@ -348,18 +348,13 @@ let%test_unit "explicit-names-to-de-Bruijn" =
   in
   assert (of_term t = t')
 
-let lift l =
-  let rec trans lvl = function
-    | DVar n ->
-        (* free AND geq l *)
-        let n' = if n >= lvl && n >= l then n + 1 else n in
-        DVar n'
-    | DApp (t, u) ->
-        DApp (trans lvl t, trans lvl u)
-    | DAbs t ->
-        DAbs (trans (lvl + 1) t)
-  in
-  trans 0
+let rec lift l = function
+  | DVar n ->
+      DVar (if n >= l then n + 1 else n)
+  | DApp (t, u) ->
+      DApp (lift l t, lift l u)
+  | DAbs t ->
+      DAbs (lift (l + 1) t)
 
 let unlift l n =
   assert (l <> n) ;
@@ -370,7 +365,7 @@ let%test_unit "lift" =
   let t' = DAbs (DApp (DVar 0, DVar 2)) in
   assert (t = t') ;
   let t = lift 1 (DAbs (DApp (DApp (DVar 0, DVar 1), DVar 2))) in
-  let t' = DAbs (DApp (DApp (DVar 0, DVar 2), DVar 3)) in
+  let t' = DAbs (DApp (DApp (DVar 0, DVar 1), DVar 3)) in
   assert (t = t')
 
 let%test_unit "unlift" =
