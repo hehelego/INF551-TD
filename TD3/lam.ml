@@ -396,7 +396,7 @@ let rec dsub x u = function
       let t2 = dsub x u t2 in
       DApp (t1, t2)
   | DAbs t ->
-      let x' = x + 1 in
+      let x' = x + 1 (* var x inside lambda abstraction is var (x+1) *) in
       let u' = lift 0 u (* avoid capture of free variables *) in
       DAbs (dsub x' u' t)
 
