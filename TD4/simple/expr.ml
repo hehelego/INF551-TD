@@ -36,6 +36,12 @@ type tm =
 type context = (var * ty) list
 (** Environments. *)
 
+type sequent = context * ty
+(** A sequent is of the form
+    Gamma |- A
+    where Gamma is a list of assumptions and A is a formula
+    *)
+
 let rec string_of_ty = function
   | TVar t -> t
   | Imp (dom, codom) ->
@@ -60,3 +66,28 @@ let rec string_of_tm = function
       ^ y ^ " -> " ^ string_of_tm r
   | Unit -> "()"
   | Absurd (e, t) -> "absurd(" ^ string_of_tm e ^ ", " ^ string_of_ty t ^ ")"
+
+let string_of_ctx ctx =
+  let type_label (x, a) = x ^ " : " ^ string_of_ty a in
+  ctx |> List.map type_label |> String.concat " , "
+
+let string_of_seq (ctx, ty) = string_of_ctx ctx ^ " |- " ^ string_of_ty ty
+
+let%test_unit "string_ctx" =
+  let ctx =
+    [
+      ("x", Imp (TVar "A", TVar "B"));
+      ("y", And (TVar "A", TVar "B"));
+      ("Z", TVar "T");
+    ]
+  in
+  print_endline (string_of_ctx ctx);
+  let str = "x : (A => B) , y : (A /\\ B) , Z : T" in
+  assert (string_of_ctx ctx = str)
+
+let%test_unit "string_seq" =
+  let ctx = [ ("x", Imp (TVar "A", TVar "B")); ("y", TVar "A") ] in
+  let seq = (ctx, TVar "B") in
+  let str = "x : (A => B) , y : A |- B" in
+  print_endline (string_of_seq seq);
+  assert (string_of_seq seq = str)
