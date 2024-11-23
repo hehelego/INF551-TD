@@ -1,0 +1,12 @@
+(A \/ B) => (A => C) => (B => C) => C
+intro x
+intro f
+intro g
+elim x
+# case left: A
+elim f
+exact x
+# case right: B
+elim g
+exact x
+

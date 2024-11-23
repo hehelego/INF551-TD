@@ -1,0 +1,11 @@
+(A => B => C) => A /\ B => C
+intro f
+intro x
+cut B => C
+# part 1: (B => C) => C
+intro g
+elim g
+snd x
+# part 2: B => C
+elim f
+fst x

@@ -1,0 +1,16 @@
+((not A) \/ B) => A => B
+intro x
+intro y
+elim x
+# case x: not A
+cut _
+## with lemma. not A, A |- _ => B
+intro bot
+elim bot
+## prove lemma. not A, A |- _
+elim x
+exact y
+# case x: B
+exact x
+
+

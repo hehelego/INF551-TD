@@ -1,0 +1,19 @@
+(A => not A) => (not A => A) => _
+intro f
+intro g
+cut not A
+# with lemma.
+intro h
+elim h
+elim g
+exact h
+# prove lemma
+intro x
+cut not A
+## with lemma
+intro h
+elim m
+exact x
+## prove lemma
+elim f
+exact x

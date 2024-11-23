@@ -1,0 +1,19 @@
+(A /\ (B \/ C)) => (A /\ B) \/ (A /\ C)
+intro x
+cut B \/ C
+# with lemma: (B \/ C) => (A /\ B) \/ (A /\ C)
+intro y
+elim y
+#   left case: B
+left
+intro
+fst x
+exact y
+#   right case: C
+right
+intro
+fst x
+exact y
+# lemma: B \/ C
+snd x
+

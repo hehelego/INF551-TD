@@ -1,0 +1,9 @@
+A \/ B => B \/ A
+intro x
+elim x
+# case left: A
+right x
+exact x
+# case right: B
+left x
+exact x

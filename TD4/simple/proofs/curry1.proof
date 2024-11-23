@@ -1,0 +1,13 @@
+(A /\ B => C) => A => B => C
+intro f
+intro x
+intro y
+cut A /\ B
+# with (A /\ B) prove C
+intro t
+elim f
+exact t
+# prove (A /\ B)
+intro
+exact x
+exact y
