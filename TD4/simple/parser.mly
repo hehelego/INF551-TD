@@ -2,6 +2,9 @@
 open Expr
 %}
 
+%token REC
+%token ZERO SUCC
+%token NAT
 %token IMP AND OR TRUE FALSE NOT
 %token FUN TO CASE OF
 %token LPAR RPAR COLON COMMA BAR
@@ -9,6 +12,7 @@ open Expr
 %token <string> IDENT
 %token EOF
 
+%right SUCC
 %right IMP
 %right OR
 %right AND
@@ -22,6 +26,7 @@ open Expr
 
 /* A type */
 ty:
+  | NAT          { Nat }
   | IDENT        { TVar $1 }
   | ty IMP ty    { Imp ($1, $3) }
   | ty AND ty    { And ($1, $3) }
@@ -44,12 +49,15 @@ atm:
 
 /* A simple term */
 stm:
-  | IDENT                        { Var $1 }
-  | LPAR tm RPAR                 { $2 }
-  | FST stm                      { Fst $2 }
-  | SND stm                      { Snd $2 }
-  | LPAR RPAR                    { Unit }
-  | LPAR tm COMMA tm RPAR        { Pair ($2, $4) }
-  | LEFT LPAR tm COMMA ty RPAR   { Left ($3, $5) }
-  | RIGHT LPAR ty COMMA tm RPAR  { Right ($3, $5) }
-  | ABSURD LPAR tm COMMA ty RPAR { Absurd ($3, $5) }
+  | IDENT                              { Var $1 }
+  | LPAR tm RPAR                       { $2 }
+  | FST stm                            { Fst $2 }
+  | SND stm                            { Snd $2 }
+  | LPAR RPAR                          { Unit }
+  | LPAR tm COMMA tm RPAR              { Pair ($2, $4) }
+  | LEFT LPAR tm COMMA ty RPAR         { Left ($3, $5) }
+  | RIGHT LPAR ty COMMA tm RPAR        { Right ($3, $5) }
+  | ABSURD LPAR tm COMMA ty RPAR       { Absurd ($3, $5) }
+  | ZERO                               { Zero }
+  | SUCC stm                           { Succ $2 }
+  | REC LPAR tm COMMA tm COMMA tm RPAR { Rec ($3, $5, $7) }

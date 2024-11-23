@@ -1,0 +1,10 @@
+Nat => Nat => Nat
+intro n
+intro m
+elim n
+# n = 0
+exact m
+# n' = Succ n, s = add n m. add (Succ n) m = Succ (add n m) = Succ s
+intro useless
+intro s
+succ s

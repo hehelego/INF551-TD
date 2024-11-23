@@ -42,6 +42,16 @@ let rec infer_type (ctx : context) = function
   | Absurd (e, a) ->
       check_type ctx e False;
       a
+  | Zero -> Nat
+  | Succ n ->
+      check_type ctx n Nat;
+      Nat
+  | Rec (n, base, step) ->
+      check_type ctx n Nat;
+      let t = infer_type ctx base in
+      let st = Imp (Nat, Imp (t, t)) in
+      check_type ctx step st;
+      t
 
 and check_type ctx tm ty =
   let _ = infer_type ctx tm = ty in
@@ -112,6 +122,17 @@ let%test_unit "type inference and checking" =
     let t = Imp (b, Imp (c, Or (True, And (a, c)))) in
     check_type [ (x, a); (y, neg a) ] (Absurd (App (y', x'), t)) t
   in
+  let zero_suc =
+    check_type [] Zero Nat;
+    check_type [] (Succ Zero) Nat;
+    check_type [ (x, Nat) ] (Succ x') Nat;
+    let plus2 = Abs (x, Nat, Succ (Succ x')) in
+    check_type [] plus2 (Imp (Nat, Nat))
+  in
+  let nat_ind =
+    let step = Abs (x, Nat, Abs (y, Nat, Succ y')) in
+    check_type [ (x, Nat) ] (Rec (Zero, Succ x', step)) Nat
+  in
 
   ax;
   intro_impl;
@@ -125,4 +146,6 @@ let%test_unit "type inference and checking" =
   intro_unit;
   elim_unit;
   ex_falso;
-  contradict
+  contradict;
+  zero_suc;
+  nat_ind

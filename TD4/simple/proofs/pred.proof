@@ -1,0 +1,9 @@
+Nat => Nat
+intro n
+elim n
+# base case: n = zero
+zero
+# induction step: [n] and [pred n] are given
+intro predn
+intro useless
+exact predn

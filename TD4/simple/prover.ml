@@ -69,6 +69,18 @@ let rec prove env goal =
           let case_right = prove ((var, b) :: env) goal in
           Case (term, var, case_left, var, case_right)
       | False -> Absurd (term, goal)
+      | Nat ->
+          let nat_term = tm_of_string arg in
+          check_type env nat_term Nat;
+          (* prove the base case for n = 0 *)
+          let base = prove env goal in
+          (* prove the induction step:
+              a natural number [n] is given and a proof for [P(n)] is given,
+              construct a proof term for [P(Succ n)]
+          *)
+          let step_type = Imp (Nat, Imp (goal, goal)) in
+          let step = prove env step_type in
+          Rec (nat_term, base, step)
       | other_type ->
           error
             ("Don't know how to eliminate a term of type "
@@ -99,6 +111,17 @@ let rec prove env goal =
       let with_lemma = prove env (Imp (lemma, goal)) in
       let lemma_term = prove env lemma in
       App (with_lemma, lemma_term)
+  | "zero" -> (
+      match goal with
+      | Nat -> Zero
+      | _ -> error ("Not the right type. Expecting " ^ string_of_ty Nat))
+  | "succ" -> (
+      match goal with
+      | Nat ->
+          let n = tm_of_string arg in
+          check_type env n Nat;
+          Succ n
+      | _ -> error ("Not the right type. Expecting " ^ string_of_ty Nat))
   | _ -> error ("Unknown command: " ^ cmd)
 
 let () =

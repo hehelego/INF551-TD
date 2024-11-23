@@ -9,6 +9,7 @@ type var = string
  *)
 type ty =
   | TVar of tvar
+  | Nat
   | Imp of ty * ty
   | And of ty * ty
   | Or of ty * ty
@@ -22,6 +23,9 @@ let neg ty = Imp (ty, False)
  *)
 type tm =
   | Var of var
+  | Zero
+  | Succ of tm
+  | Rec of tm * tm * tm
   | App of tm * tm
   | Abs of var * ty * tm
   | Pair of tm * tm
@@ -44,6 +48,7 @@ type sequent = context * ty
 
 let rec string_of_ty = function
   | TVar t -> t
+  | Nat -> "Nat"
   | Imp (dom, codom) ->
       "(" ^ string_of_ty dom ^ " => " ^ string_of_ty codom ^ ")"
   | And (t1, t2) -> "(" ^ string_of_ty t1 ^ " /\\ " ^ string_of_ty t2 ^ ")"
@@ -53,6 +58,11 @@ let rec string_of_ty = function
 
 let rec string_of_tm = function
   | Var x -> x
+  | Zero -> "Zero"
+  | Succ n -> "(Succ " ^ string_of_tm n ^ ")"
+  | Rec (n, base, step) ->
+      "case " ^ string_of_tm n ^ " of " ^ "Zero -> " ^ string_of_tm base ^ "|"
+      ^ "(Succ n) -> " ^ string_of_tm step
   | App (t, u) -> "(" ^ string_of_tm t ^ " " ^ string_of_tm u ^ ")"
   | Abs (x, a, t) ->
       "(fun (" ^ x ^ " : " ^ string_of_ty a ^ ") -> " ^ string_of_tm t ^ ")"
