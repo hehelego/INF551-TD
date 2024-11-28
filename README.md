@@ -10,5 +10,5 @@ Progress
 - TD4: (Work in progress) working on the dependent type prover
 - TD5: Complete
 - TD6: Complete
-- TD7: (Work in progress) working on 3 preservation of elements
+- TD7: Complete
 - TD8: All required tasks done. Unfinished: 3.3 support for lambda abstractions
