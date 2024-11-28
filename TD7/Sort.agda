@@ -444,3 +444,56 @@ mergesort'' l = let n = length l in mergesort-wf l (wfNat n)
 
 mergesort''-sorting : (l : List ℕ) → sorted (mergesort'' l)
 mergesort''-sorting l = let n = length l in mergesort-wf-sorting l (wfNat n)
+
+
+-- Prove that insertion sort only permutate the input list and never add/remove/modify any element.
+
+-- xs ~ ys if-and-only-if ys is a permutation of xs
+data _~_ {A : Set} : List A → List A → Set where
+  ~-nil : [] ~ []
+  ~-drop : (x : A) {l l' : List A} → l ~ l' → (x ∷ l) ~ (x ∷ l')
+  ~-swap : (x y : A) (l : List A) → (x ∷ y ∷ l) ~ (y ∷ x ∷ l)
+  ~-trans : {l l' l'' : List A} → l ~ l' → l' ~ l'' → l ~ l''
+
+~-refl : {A : Set} {l : List A} → l ~ l
+~-refl {A} {[]} = ~-nil
+~-refl {A} {x ∷ l} = ~-drop x (~-refl {A} {l})
+
+~-sym : {A : Set} {l l' : List A} → l ~ l' → l' ~ l
+~-sym ~-nil = ~-nil
+~-sym (~-drop x l~l') = ~-drop x (~-sym l~l')
+~-sym (~-swap x y l) = ~-swap y x l
+~-sym (~-trans l~l' l~l'') = ~-trans (~-sym l~l'') (~-sym l~l')
+
+
+-- (z ∷ x ∷ l) ~ (x ∷ z ∷ l) ~ (x ∷ (insert z l))
+insert-~ : (x : ℕ) (l : List ℕ) → (x ∷ l) ~ (insert x l)
+insert-~ z [] = ~-refl
+insert-~ z (x ∷ [])
+  with z ≤? x
+... | left  z≤x = ~-refl
+... | right x≤z = ~-swap z x []
+insert-~ z (x ∷ l)
+  with z ≤? x
+... | left  z≤x = ~-refl
+... | right x≤z = let IH = insert-~ z l
+                      z:x:l~x:z:l = ~-swap z x l
+                      x:z:l~x:ins-z-l = ~-drop x IH
+                   in ~-trans z:x:l~x:z:l x:z:l~x:ins-z-l
+
+-- (x ∷ l)  ~ insert x l
+-- (x ∷ l') ~ insert x l'
+-- l ~ l' ⊢ (x ∷ l) ~ (x ∷ l')
+~-insert : (x : ℕ) {l l' : List ℕ} → l ~ l' → insert x l ~ insert x l'
+~-insert x {l} {l'} l~l' = let x:l~ins   = insert-~ x l
+                               ins~x:l   = ~-sym x:l~ins
+                               x:l~x:l'  = ~-drop x l~l'
+                               x:l'~ins' = insert-~ x l'
+                            in ~-trans ins~x:l (~-trans x:l~x:l' x:l'~ins')
+
+-- ⊢ (x ∷ l) ~ insert x l
+-- l ~ sort l ⊢ insert x l ~ insert x (sort l)
+sort-~ : (l : List ℕ) → l ~ (sort l)
+sort-~ [] = ~-nil
+sort-~ (x ∷ l) = let IH = sort-~ l
+                  in ~-trans (insert-~ x l) (~-insert x IH)
