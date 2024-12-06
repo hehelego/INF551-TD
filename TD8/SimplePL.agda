@@ -10,6 +10,9 @@ open import Data.Nat renaming (ℕ to Nat)
 open import Data.Product renaming (proj₁ to fst ; proj₂ to snd)
 open import Relation.Binary.PropositionalEquality
 
+1=1 : 1 ≡ 1
+1=1 = refl
+
 data Trichotomy : Nat → Nat → Set where
   tri-= : {m n : Nat} → m ≡ n → Trichotomy m n
   tri-< : {m n : Nat} → m < n → Trichotomy m n
@@ -52,6 +55,10 @@ infixl 15 _//_
 data Ctx where
   ∅ : Ctx
   _//_ : Ctx → Type → Ctx
+
+ctx-len : Ctx → Nat
+ctx-len ∅ = zero
+ctx-len (Γ // X) = suc (ctx-len Γ)
 
 data Lookup where
   at-head : {Γ : Ctx} {A : Type} → Lookup (Γ // A) zero A
@@ -100,6 +107,20 @@ lift n (var x) with dec< x n
 lift n (abs p) = let p' = lift (suc n) p in abs p'
 lift n (p · q) = let p' = lift n p ; q' = lift n q in p' · q'
 
+-- ∅ // T3 // T2 // T1 // T0 ⊢ x0 x1 x2 x3
+-- lift0: x1 x2 x3 x4 (T' T0 T1 T2 T3)
+-- lift1: x0 x2 x3 x4 (T0 T' T1 T2 T3)
+-- lift2: x0 x1 x3 x4 (T0 T1 T' T2 T3)
+-- lift3: x0 x1 x2 x4 (T0 T1 T2 T' T3)
+-- lift4: x0 x1 x2 x3 (T0 T1 T2 T3 T')
+
+-- a term of the type Insert Γ n X Γ'
+-- is the evidence that inserting X at the n-th position of Γ results in Γ'
+data Insert : (Γ : Ctx) (n : Nat) (X : Type) (Γ' : Ctx) → Set where
+  ins-zero : {Γ : Ctx} {X : Type} → Insert Γ zero X (Γ // X)
+  ins-suc  : {Γ : Ctx} {n : Nat} {X Y : Type} {Γ' : Ctx}
+           → Insert Γ n X Γ'
+           → Insert (Γ // Y) (suc n) X (Γ' // Y)
 
 subs : Prog → Nat → Prog → Prog
 subs (bool x) n r = bool x
@@ -185,82 +206,116 @@ data Value where
   pairV : {p q : Prog} → Value p → Value q → Value ⟨ p , q ⟩
   lambdaV : {p : Prog} → Value (abs p)
 
--- subs-lift-lemma : {Γ : Ctx} {p q : Prog} {A B : Type} {n : Nat}
---                 → Γ ⊢ subs (abs p) n q ∷ A ⇒ B
---                 → Γ ⊢ abs (subs p (suc n) (lift 0 q)) ∷ A ⇒ B
--- subs-lift-lemma = ?
 
 
--- falsified :
--- A ⊢ var 0 ∷ A
--- A // B ⊢ var 0 ∷ B
--- weaken : {Γ : Ctx} {p : Prog} {A C : Type}
---        → Γ ⊢ p ∷ A
---        → Γ // C ⊢ p ∷ A
+-- lookup-shift-A : {n m : Nat} {n≤m : n ≤ m} {Γ : Ctx} {valid-n : n ≤ ctx-len Γ} {A X : Type}
+--              → Lookup Γ m A → Lookup (insert n Γ X) (suc m) A
+-- lookup-shift-A {zero} {zero} at-head = in-tail at-head
+-- lookup-shift-A {zero} {suc m} (in-tail lookup) = in-tail (in-tail lookup)
+-- lookup-shift-A {suc n} {suc m} {s≤s n≤m} (in-tail lookup) = in-tail (lookup-shift-A {n} {m} {n≤m} lookup)
+--
+-- lookup-shift-B : {n m : Nat} {m<n : m < n} {Γ : Ctx} {A X : Type}
+--              → Lookup Γ m A → Lookup (insert n Γ X) m A
+-- lookup-shift-B {suc n} {zero} at-head = at-head
+-- lookup-shift-B {suc n} {suc m} {s<s m<n} (in-tail lookup) = in-tail (lookup-shift-B {n} {m} {m<n} lookup)
 
-lift-lemma : {n : Nat} {Γ : Ctx} {p : Prog} {A C : Type}
+lookup-lift-lt : {Γ : Ctx} {n : Nat} {Γ' : Ctx} {X : Type} {ins : Insert Γ n X Γ'}
+                 {i : Nat} {i<n : i < n} {A : Type}
+               → Lookup Γ i A → Lookup Γ' i A
+lookup-lift-lt {n = suc n} {ins = ins-suc ins} {i = zero} {i<n = z<s} at-head = at-head
+lookup-lift-lt {n = suc n} {ins = ins-suc ins} {i = suc i} {i<n = s<s i<n} (in-tail lookup) =
+  in-tail (lookup-lift-lt {n = n} {ins = ins} {i = i} {i<n = i<n} lookup)
+
+lookup-lift-geq : {Γ : Ctx} {n : Nat} {Γ' : Ctx} {X : Type} {ins : Insert Γ n X Γ'}
+                  {i : Nat} {n≤i : n ≤ i} {A : Type}
+                → Lookup Γ i A → Lookup Γ' (suc i) A
+lookup-lift-geq {n = zero} {ins = ins-zero} {i = zero} {n≤i = z≤n} at-head = in-tail at-head
+lookup-lift-geq {n = zero} {ins = ins-zero} {i = suc i} {n≤i = z≤n} (in-tail lookup) =
+  in-tail (lookup-lift-geq {n = zero} {ins = ins-zero} {i = i} {n≤i = z≤n} lookup)
+lookup-lift-geq {n = suc n} {ins = ins-suc ins} {i = suc i} {n≤i = s≤s n≤i} (in-tail lookup) =
+  in-tail (lookup-lift-geq {n = n} {ins = ins} {i = i} {n≤i = n≤i} lookup)
+
+lift-lemma : {Γ : Ctx} {n : Nat} {Γ' : Ctx} {X : Type} {ins : Insert Γ n X Γ'}
+             {p : Prog} {A : Type}
            → Γ ⊢ p ∷ A
-           → Γ // C ⊢ lift n p ∷ A
+           → Γ' ⊢ lift n p ∷ A
 lift-lemma ⊢ℕ = ⊢ℕ
 lift-lemma ⊢𝔹 = ⊢𝔹
-lift-lemma (⊢+ ⊢p:N ⊢q:N) = let ⊢p:N' = lift-lemma ⊢p:N
-                                ⊢q:N' = lift-lemma ⊢q:N
-                             in ⊢+ ⊢p:N' ⊢q:N'
-lift-lemma (⊢< ⊢p:N ⊢q:N) = {! !}
-lift-lemma (⊢if ⊢p:B ⊢p:A ⊢q:A) = {! !}
-lift-lemma (⊢pair ⊢p:A ⊢q:B) = {! !}
-lift-lemma (⊢proj0 ⊢p:AB) = {! !}
-lift-lemma (⊢proj1 ⊢p:AB) = {! !}
-lift-lemma ⊢𝟙 = ⊢𝟙
-lift-lemma {n} (⊢ax at-head) with dec< 0 n
-... | left  x<n = ⊢ax {! !} -- was...
-... | right n≤x = ?
-lift-lemma (⊢ax (in-tail lookup)) = ?
-lift-lemma (⊢app ⊢p:AB ⊢q:A) = {! !}
-lift-lemma (⊢abs B⊢p:A) = ⊢abs {! !}
+lift-lemma {ins = ins} (⊢+ ⊢p:N ⊢q:N) =
+  let ⊢p:N' = lift-lemma {ins = ins} ⊢p:N
+      ⊢q:N' = lift-lemma {ins = ins} ⊢q:N
+   in ⊢+ ⊢p:N' ⊢q:N'
+lift-lemma {ins = ins} (⊢< ⊢p:N ⊢q:N) =
+  let ⊢p:N' = lift-lemma {ins = ins} ⊢p:N
+      ⊢q:N' = lift-lemma {ins = ins} ⊢q:N
+   in ⊢< ⊢p:N' ⊢q:N'
+lift-lemma {ins = ins} (⊢if ⊢c:B ⊢p:A ⊢q:A) =
+  let ⊢c:B' = lift-lemma {ins = ins} ⊢c:B
+      ⊢p:A' = lift-lemma {ins = ins} ⊢p:A
+      ⊢q:A' = lift-lemma {ins = ins} ⊢q:A
+   in ⊢if ⊢c:B' ⊢p:A' ⊢q:A'
+lift-lemma {ins = ins} (⊢pair ⊢p:A ⊢q:B) =
+  let ⊢p:A' = lift-lemma {ins = ins} ⊢p:A
+      ⊢q:B' = lift-lemma {ins = ins} ⊢q:B
+   in ⊢pair ⊢p:A' ⊢q:B'
+lift-lemma {ins = ins} (⊢proj0 ⊢p:AB) = ⊢proj0 (lift-lemma {ins = ins} ⊢p:AB)
+lift-lemma {ins = ins} (⊢proj1 ⊢p:AB) = ⊢proj1 (lift-lemma {ins = ins} ⊢p:AB)
+lift-lemma {ins = ins} ⊢𝟙 = ⊢𝟙
+lift-lemma {ins = ins} (⊢app ⊢p:A⇒B ⊢q:A) =
+  let ⊢p:A⇒B' = lift-lemma {ins = ins} ⊢p:A⇒B
+      ⊢q:A'   = lift-lemma {ins = ins} ⊢q:A
+   in ⊢app ⊢p:A⇒B' ⊢q:A'
+lift-lemma {n = n} {ins = ins} {p = var i} (⊢ax lookup) with dec< i n
+... | left  i<n = ⊢ax (lookup-lift-lt  {n = n} {ins = ins} {i<n = i<n} lookup)
+... | right n≤i = ⊢ax (lookup-lift-geq {n = n} {ins = ins} {n≤i = n≤i} lookup)
+lift-lemma {ins = ins} (⊢abs lam) = ⊢abs (lift-lemma {ins = ins-suc ins} lam)
 
-subs-lemma : {Γ : Ctx} {p q : Prog} {C A : Type}
-           → Γ // C ⊢ p ∷ A
-           → Γ ⊢ q ∷ C
-           → Γ ⊢ subs p 0 q ∷ A
-subs-lemma ⊢ℕ ⊢q:C = ⊢ℕ
-subs-lemma ⊢𝔹 ⊢q:C = ⊢𝔹
-subs-lemma (⊢+ C⊢p:N C⊢q:N) ⊢q:C = let ⊢p:N = subs-lemma C⊢p:N ⊢q:C 
-                                       ⊢q:N = subs-lemma C⊢q:N ⊢q:C
-                                    in ⊢+ ⊢p:N ⊢q:N
-subs-lemma (⊢< C⊢p:N C⊢q:N) ⊢q:C = let ⊢p:N = subs-lemma C⊢p:N ⊢q:C 
-                                       ⊢q:N = subs-lemma C⊢q:N ⊢q:C
-                                    in ⊢< ⊢p:N ⊢q:N
-subs-lemma (⊢if C⊢c:B C⊢p:A C⊢q:A) ⊢q:C = let ⊢c:B = subs-lemma C⊢c:B ⊢q:C 
-                                              ⊢p:A = subs-lemma C⊢p:A ⊢q:C
-                                              ⊢q:A = subs-lemma C⊢q:A ⊢q:C
-                                           in ⊢if ⊢c:B ⊢p:A ⊢q:A
-subs-lemma (⊢pair C⊢p:A C⊢q:B) ⊢q:C = let ⊢p:A = subs-lemma C⊢p:A ⊢q:C 
-                                          ⊢q:B = subs-lemma C⊢q:B ⊢q:C
-                                       in ⊢pair ⊢p:A ⊢q:B
-subs-lemma (⊢proj0 C⊢p:AB) ⊢q:C = let ⊢p:AB = subs-lemma C⊢p:AB ⊢q:C in ⊢proj0 ⊢p:AB
-subs-lemma (⊢proj1 C⊢p:AB) ⊢q:C = let ⊢p:AB = subs-lemma C⊢p:AB ⊢q:C in ⊢proj1 ⊢p:AB
-subs-lemma ⊢𝟙 ⊢q:C = ⊢𝟙
-subs-lemma (⊢ax at-head) ⊢q:C = ⊢q:C
-subs-lemma (⊢ax (in-tail lookup)) ⊢q:C = ⊢ax lookup
-subs-lemma (⊢app C⊢p:A⇒B C⊢q:A) ⊢q:C = let ⊢p:A⇒B = subs-lemma C⊢p:A⇒B ⊢q:C 
-                                           ⊢q:A   = subs-lemma C⊢q:A   ⊢q:C
-                                        in ⊢app ⊢p:A⇒B ⊢q:A
-subs-lemma {Γ} {abs p} {q} {C} {A ⇒ B} (⊢abs C⊢p:A) ⊢q:C = g0
-  where
-        g1 : Γ // A ⊢ subs p 1 (lift 0 q) ∷ B
-        g1 = {! !}
-        g0 : Γ ⊢ abs (subs p 1 (lift 0 q)) ∷ A ⇒ B
-        g0 = ⊢abs g1
+subs-lemma-n : {Γ Γ' : Ctx} {n : Nat} {p q : Prog} {X A : Type}
+               {ins : Insert Γ n X Γ'}
+             → Γ' ⊢ p ∷ A
+             → Γ  ⊢ q ∷ X
+             → Γ  ⊢ subs p n q ∷ A
+subs-lemma-n {ins = ins} ⊢ℕ ⊢q:X = ⊢ℕ
+subs-lemma-n {ins = ins} ⊢𝔹 ⊢q:X = ⊢𝔹
+subs-lemma-n {ins = ins} (⊢+ X⊢p:N X⊢q:N) ⊢q:X =
+  let ⊢p:N = subs-lemma-n {ins = ins} X⊢p:N ⊢q:X 
+      ⊢q:N = subs-lemma-n {ins = ins} X⊢q:N ⊢q:X
+   in ⊢+ ⊢p:N ⊢q:N
+subs-lemma-n {ins = ins} (⊢< X⊢p:N X⊢q:N) ⊢q:X =
+  let ⊢p:N = subs-lemma-n {ins = ins} X⊢p:N ⊢q:X 
+      ⊢q:N = subs-lemma-n {ins = ins} X⊢q:N ⊢q:X
+   in ⊢< ⊢p:N ⊢q:N
+subs-lemma-n {ins = ins} (⊢if X⊢c:B X⊢p:A X⊢q:A) ⊢q:X =
+  let ⊢c:B = subs-lemma-n {ins = ins} X⊢c:B ⊢q:X 
+      ⊢p:A = subs-lemma-n {ins = ins} X⊢p:A ⊢q:X
+      ⊢q:A = subs-lemma-n {ins = ins} X⊢q:A ⊢q:X
+   in ⊢if ⊢c:B ⊢p:A ⊢q:A
+subs-lemma-n {ins = ins} (⊢pair X⊢p:A X⊢q:B) ⊢q:X =
+  let ⊢p:A = subs-lemma-n {ins = ins} X⊢p:A ⊢q:X 
+      ⊢q:B = subs-lemma-n {ins = ins} X⊢q:B ⊢q:X
+   in ⊢pair ⊢p:A ⊢q:B
+subs-lemma-n {ins = ins} (⊢proj0 X⊢p:AB) ⊢q:X = let ⊢p:AB = subs-lemma-n {ins = ins} X⊢p:AB ⊢q:X in ⊢proj0 ⊢p:AB
+subs-lemma-n {ins = ins} (⊢proj1 X⊢p:AB) ⊢q:X = let ⊢p:AB = subs-lemma-n {ins = ins} X⊢p:AB ⊢q:X in ⊢proj1 ⊢p:AB
+subs-lemma-n {ins = ins} ⊢𝟙 ⊢q:X = ⊢𝟙
+-- variable
+subs-lemma-n {n = zero} {ins = ins-zero} (⊢ax at-head) ⊢q:X = ⊢q:X
+subs-lemma-n {n = suc n} {ins = ins-suc ins} (⊢ax at-head) ⊢q:X = ⊢ax at-head
+subs-lemma-n {n = .zero} {p = var (suc m)} {ins = ins-zero} (⊢ax (in-tail lookup)) ⊢q:X = ⊢ax lookup
+subs-lemma-n {n = suc n} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X
+  with trichotomy m n
+subs-lemma-n {n = .(suc m)} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X | tri-= refl rewrite 1=1 = {! !}
+subs-lemma-n {n = suc n} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X | tri-< m<n rewrite 1=1 = {! !}
+subs-lemma-n {n = suc n} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X | tri-> m>n rewrite 1=1 = {! !}
+-- application
+subs-lemma-n {ins = ins} (⊢app X⊢p:A⇒B X⊢q:A) ⊢q:X =
+  let ⊢p:A⇒B = subs-lemma-n {ins = ins} X⊢p:A⇒B ⊢q:X 
+      ⊢q:A   = subs-lemma-n {ins = ins} X⊢q:A   ⊢q:X
+   in ⊢app ⊢p:A⇒B ⊢q:A
+-- abstraction
+subs-lemma-n {p = abs p} {q} {X} {A ⇒ B} {ins} (⊢abs CA⊢p:B) ⊢q:X =
+  let t = lift-lemma {ins = ins-zero} ⊢q:X
+   in ⊢abs (subs-lemma-n {ins = ins-suc ins} CA⊢p:B t)
 
-
--- A B C : Type
--- C⊢p:A : Γ // C // A ⊢ p ∷ B
--- p q : Prog
--- Γ : Ctx
--- ⊢q:C : Γ ⊢ q ∷ C
--- ----------------------------------
--- Goal: Γ ⊢ subs (abs p) 0 q ∷ A ⇒ B
 
 preservation : {Γ : Ctx} {A : Type} {p q : Prog}
              → Γ ⊢ p ∷ A
@@ -289,23 +344,10 @@ preservation (⊢proj1 (⊢pair ⊢p:A ⊢q:B)) pair-snd = ⊢q:B
 -- function
 preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-left  p↦p') = let ⊢p':A⇒B = preservation ⊢p:A⇒B p↦p' in ⊢app ⊢p':A⇒B ⊢q:A
 preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-right q↦q') = let ⊢q':A   = preservation ⊢q:A   q↦q' in ⊢app ⊢p:A⇒B  ⊢q':A
-preservation (⊢app (⊢abs A⊢p:B) ⊢q:A) app-beta = subs-lemma A⊢p:B ⊢q:A
+preservation (⊢app (⊢abs A⊢p:B) ⊢q:A) app-beta = subs-lemma-n {ins = ins-zero} A⊢p:B ⊢q:A
 
--- preserve : {A : Type} {p q : Prog} → ⊢ p ∷ A → p ↦ q → ⊢ q ∷ A
--- preserve {ℕ} ⊢p:N +-natval = ⊢ℕ
--- preserve {ℕ} (⊢+ ⊢p:N ⊢q:N) (+-left  p↦p') = let ⊢p':N = preserve ⊢p:N p↦p' in ⊢+ ⊢p':N ⊢q:N
--- preserve {ℕ} (⊢+ ⊢p:N ⊢q:N) (+-right q↦q') = let ⊢q':N = preserve ⊢q:N q↦q' in ⊢+ ⊢p:N  ⊢q':N
--- preserve (⊢< ⊢m:N ⊢n:N) (<-true  m<n) = ⊢𝔹
--- preserve (⊢< ⊢m:N ⊢n:N) (<-false n≤m) = ⊢𝔹
--- preserve (⊢< ⊢p:N ⊢q:N) (<-left  p↦p') = let ⊢p':N = preserve ⊢p:N p↦p' in ⊢< ⊢p':N ⊢q:N
--- preserve (⊢< ⊢p:N ⊢q:N) (<-right q↦q') = let ⊢q':N = preserve ⊢q:N q↦q' in ⊢< ⊢p:N  ⊢q':N
--- preserve (⊢if ⊢c:B ⊢p:A ⊢q:A) if-true  = ⊢p:A
--- preserve (⊢if ⊢c:B ⊢p:A ⊢q:A) if-false = ⊢q:A
--- preserve (⊢if ⊢c:B ⊢p:A ⊢q:A) (if-cond c↦c') = let ⊢c':B = preserve ⊢c:B c↦c' in ⊢if ⊢c':B ⊢p:A ⊢q:A
--- preserve (⊢pair ⊢p:A ⊢q:B) (pair-left  p↦p') = let ⊢p':A = preserve ⊢p:A p↦p' in ⊢pair ⊢p':A ⊢q:B
--- preserve (⊢pair ⊢p:A ⊢q:B) (pair-right q↦q') = let ⊢q':B = preserve ⊢q:B q↦q' in ⊢pair ⊢p:A  ⊢q':B
--- preserve {𝟙} {unit} ⊢𝟙 ()
---
+
+
 -- progress : {A : Type} {p : Prog} → ⊢ p ∷ A → Σ Prog (λ q → p ↦ q) ∨ Value p
 -- progress ⊢ℕ = right natV
 -- progress ⊢𝔹 = right boolV
