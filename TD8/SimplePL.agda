@@ -10,9 +10,6 @@ open import Data.Nat renaming (ℕ to Nat)
 open import Data.Product renaming (proj₁ to fst ; proj₂ to snd)
 open import Relation.Binary.PropositionalEquality
 
-1=1 : 1 ≡ 1
-1=1 = refl
-
 data Trichotomy : Nat → Nat → Set where
   tri-= : {m n : Nat} → m ≡ n → Trichotomy m n
   tri-< : {m n : Nat} → m < n → Trichotomy m n
@@ -207,18 +204,6 @@ data Value where
   lambdaV : {p : Prog} → Value (abs p)
 
 
-
--- lookup-shift-A : {n m : Nat} {n≤m : n ≤ m} {Γ : Ctx} {valid-n : n ≤ ctx-len Γ} {A X : Type}
---              → Lookup Γ m A → Lookup (insert n Γ X) (suc m) A
--- lookup-shift-A {zero} {zero} at-head = in-tail at-head
--- lookup-shift-A {zero} {suc m} (in-tail lookup) = in-tail (in-tail lookup)
--- lookup-shift-A {suc n} {suc m} {s≤s n≤m} (in-tail lookup) = in-tail (lookup-shift-A {n} {m} {n≤m} lookup)
---
--- lookup-shift-B : {n m : Nat} {m<n : m < n} {Γ : Ctx} {A X : Type}
---              → Lookup Γ m A → Lookup (insert n Γ X) m A
--- lookup-shift-B {suc n} {zero} at-head = at-head
--- lookup-shift-B {suc n} {suc m} {s<s m<n} (in-tail lookup) = in-tail (lookup-shift-B {n} {m} {m<n} lookup)
-
 lookup-lift-lt : {Γ : Ctx} {n : Nat} {Γ' : Ctx} {X : Type} {ins : Insert Γ n X Γ'}
                  {i : Nat} {i<n : i < n} {A : Type}
                → Lookup Γ i A → Lookup Γ' i A
@@ -298,14 +283,33 @@ subs-lemma-n {ins = ins} (⊢proj0 X⊢p:AB) ⊢q:X = let ⊢p:AB = subs-lemma-n
 subs-lemma-n {ins = ins} (⊢proj1 X⊢p:AB) ⊢q:X = let ⊢p:AB = subs-lemma-n {ins = ins} X⊢p:AB ⊢q:X in ⊢proj1 ⊢p:AB
 subs-lemma-n {ins = ins} ⊢𝟙 ⊢q:X = ⊢𝟙
 -- variable
-subs-lemma-n {n = zero} {ins = ins-zero} (⊢ax at-head) ⊢q:X = ⊢q:X
-subs-lemma-n {n = suc n} {ins = ins-suc ins} (⊢ax at-head) ⊢q:X = ⊢ax at-head
-subs-lemma-n {n = .zero} {p = var (suc m)} {ins = ins-zero} (⊢ax (in-tail lookup)) ⊢q:X = ⊢ax lookup
-subs-lemma-n {n = suc n} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X
+subs-lemma-n {Γ} {n = n} {p = var m} {q} {ins = ins} (⊢ax lookup) ⊢q:X
   with trichotomy m n
-subs-lemma-n {n = .(suc m)} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X | tri-= refl rewrite 1=1 = {! !}
-subs-lemma-n {n = suc n} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X | tri-< m<n rewrite 1=1 = {! !}
-subs-lemma-n {n = suc n} {p = var (suc m)} {ins = ins-suc ins} (⊢ax (in-tail lookup)) ⊢q:X | tri-> m>n rewrite 1=1 = {! !}
+... | tri-= m=n =
+  let X=A = matched m=n ins lookup in subst (Γ ⊢ q ∷_) X=A ⊢q:X
+  where matched : {m n : Nat} {Γ Γ' : Ctx} {X A : Type}
+                → m ≡ n
+                → Insert Γ n X Γ'
+                → Lookup Γ' m A
+                → X ≡ A
+        matched {zero} {zero} refl ins-zero at-head = refl
+        matched {suc m} {suc n} m=n (ins-suc ins) (in-tail lookup) = matched (cong pred m=n) ins lookup
+... | tri-< m<n = ⊢ax (matched m<n ins lookup)
+  where matched : {m n : Nat} {Γ Γ' : Ctx} {X A : Type}
+                → m < n
+                → Insert Γ n X Γ'
+                → Lookup Γ' m A
+                → Lookup Γ m A
+        matched {zero} {suc n} m<n (ins-suc ins) at-head = at-head
+        matched {suc m} {suc n} (s<s m<n) (ins-suc ins) (in-tail lookup) = in-tail (matched m<n ins lookup)
+... | tri-> m>n = ⊢ax (matched m>n ins lookup)
+  where matched : {m n : Nat} {Γ Γ' : Ctx} {X A : Type}
+                → n < m
+                → Insert Γ n X Γ'
+                → Lookup Γ' m A
+                → Lookup Γ (pred m) A
+        matched {suc m} {zero} n<m ins-zero (in-tail lookup) = lookup
+        matched {(suc (suc m))} {suc n} (s<s {_} {_} n<m) (ins-suc ins) (in-tail lookup) = in-tail (matched n<m ins lookup)
 -- application
 subs-lemma-n {ins = ins} (⊢app X⊢p:A⇒B X⊢q:A) ⊢q:X =
   let ⊢p:A⇒B = subs-lemma-n {ins = ins} X⊢p:A⇒B ⊢q:X 
@@ -345,7 +349,6 @@ preservation (⊢proj1 (⊢pair ⊢p:A ⊢q:B)) pair-snd = ⊢q:B
 preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-left  p↦p') = let ⊢p':A⇒B = preservation ⊢p:A⇒B p↦p' in ⊢app ⊢p':A⇒B ⊢q:A
 preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-right q↦q') = let ⊢q':A   = preservation ⊢q:A   q↦q' in ⊢app ⊢p:A⇒B  ⊢q':A
 preservation (⊢app (⊢abs A⊢p:B) ⊢q:A) app-beta = subs-lemma-n {ins = ins-zero} A⊢p:B ⊢q:A
-
 
 
 -- progress : {A : Type} {p : Prog} → ⊢ p ∷ A → Σ Prog (λ q → p ↦ q) ∨ Value p
