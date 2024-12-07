@@ -2,13 +2,11 @@
 -- agda 2.6.3
 -- agda-stdlib 2.1
 
-open import Data.Unit using (⊤ ; tt)
 open import Data.Bool using (Bool ; true ; false)
-open import Data.Product renaming (_×_ to _∧_ ; proj₁ to fst ; proj₂ to snd)
+open import Data.Nat renaming (ℕ to Nat) using (zero ; suc ; pred ; _+_ ; _<_ ; _≤_ ; z<s ; z≤n ; s<s ; s≤s)
+open import Data.Product renaming (_×_ to _∧_)
 open import Data.Sum renaming (_⊎_ to _∨_ ; inj₁ to left ; inj₂ to right)
-open import Data.Nat renaming (ℕ to Nat)
-open import Data.Product renaming (proj₁ to fst ; proj₂ to snd)
-open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.PropositionalEquality using (_≡_ ; refl ; cong ; subst)
 
 data Trichotomy : Nat → Nat → Set where
   tri-= : {m n : Nat} → m ≡ n → Trichotomy m n
@@ -170,8 +168,8 @@ data _↦_ where
   pair-fst : {p q : Prog} → proj0 ⟨ p , q ⟩ ↦ p
   pair-snd : {p q : Prog} → proj1 ⟨ p , q ⟩ ↦ q
   -- reduce a function call
-  app-left  : {p p' q : Prog} → p ↦ p' → p · q ↦ p' · q
-  app-right : {p q q' : Prog} → q ↦ q' → p · q ↦ p · q'
+  app-func  : {p p' q : Prog} → p ↦ p' → p · q ↦ p' · q
+  app-args : {p q q' : Prog} → q ↦ q' → p · q ↦ p · q'
   app-beta : {p q : Prog} → (abs p) · q ↦ (subs p 0 q)
 
 
@@ -342,45 +340,64 @@ preservation (⊢if ⊢c:B ⊢p:A ⊢q:A) (if-cond c↦c') = let ⊢c':B = prese
 preservation (⊢pair ⊢p:A ⊢q:B) (pair-left  p↦p') = let ⊢p':A = preservation ⊢p:A p↦p' in ⊢pair ⊢p':A ⊢q:B
 preservation (⊢pair ⊢p:A ⊢q:B) (pair-right q↦q') = let ⊢q':B = preservation ⊢q:B q↦q' in ⊢pair ⊢p:A  ⊢q':B
 preservation (⊢proj0 ⊢p:AB) (proj0-pair p↦p') = let ⊢p':AB = preservation ⊢p:AB p↦p' in ⊢proj0 ⊢p':AB
-preservation (⊢proj0 (⊢pair ⊢p:A ⊢q:B)) pair-fst = ⊢p:A
 preservation (⊢proj1 ⊢p:AB) (proj1-pair p↦p') = let ⊢p':AB = preservation ⊢p:AB p↦p' in ⊢proj1 ⊢p':AB
+preservation (⊢proj0 (⊢pair ⊢p:A ⊢q:B)) pair-fst = ⊢p:A
 preservation (⊢proj1 (⊢pair ⊢p:A ⊢q:B)) pair-snd = ⊢q:B
 -- function
-preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-left  p↦p') = let ⊢p':A⇒B = preservation ⊢p:A⇒B p↦p' in ⊢app ⊢p':A⇒B ⊢q:A
-preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-right q↦q') = let ⊢q':A   = preservation ⊢q:A   q↦q' in ⊢app ⊢p:A⇒B  ⊢q':A
+preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-func p↦p') = let ⊢p':A⇒B = preservation ⊢p:A⇒B p↦p' in ⊢app ⊢p':A⇒B ⊢q:A
+preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-args q↦q') = let ⊢q':A   = preservation ⊢q:A   q↦q' in ⊢app ⊢p:A⇒B  ⊢q':A
 preservation (⊢app (⊢abs A⊢p:B) ⊢q:A) app-beta = subs-lemma-n {ins = ins-zero} A⊢p:B ⊢q:A
 
 
--- progress : {A : Type} {p : Prog} → ⊢ p ∷ A → Σ Prog (λ q → p ↦ q) ∨ Value p
--- progress ⊢ℕ = right natV
--- progress ⊢𝔹 = right boolV
--- progress {ℕ} {p +ₑ q} (⊢+ ⊢p:N ⊢q:N) 
---   with progress ⊢p:N
--- ... | left (p' , p↦p') = left (p' +ₑ q , +-left  p↦p')
--- ... | right (natV {m})
---   with progress ⊢q:N
--- ... | left (q' , q↦q') = left (p +ₑ q' , +-right q↦q')
--- ... | right (natV {n}) = left (nat (m + n) , +-natval)
--- progress {𝔹} {p <ₑ q} (⊢< ⊢p:N ⊢q:N)
---   with progress ⊢p:N
--- ... | left (p' , p↦p') = left (p' <ₑ q , <-left  p↦p')
--- ... | right (natV {m})
---   with progress ⊢q:N
--- ... | left (q' , q↦q') = left (p <ₑ q' , <-right q↦q')
--- ... | right (natV {n})
---   with dec< m n
--- ... | left  m<n = left (bool true  , <-true  m<n)
--- ... | right n≤m = left (bool false , <-false n≤m)
--- progress {A} {if c then p else q} (⊢if ⊢c:B ⊢p:A ⊢q:A) 
---   with progress ⊢c:B
--- ... | left (c' , c↦c') = left (if c' then p else q , if-cond c↦c')
--- ... | right (boolV {true} ) = left (p , if-true )
--- ... | right (boolV {false}) = left (q , if-false)
--- progress {⟪ A , B ⟫} {⟨ p , q ⟩} (⊢pair ⊢p:A ⊢q:B)
---   with progress ⊢p:A
--- ... | left (p' , p↦p') = left (⟨ p' , q ⟩ , pair-left   p↦p')
--- ... | right vp
---   with progress ⊢q:B
--- ... | left (q' , q↦q') = left (⟨ p , q' ⟩ , pair-right  q↦q')
--- ... | right vq = right (pairV vp vq)
--- progress {𝟙} {unit} ⊢𝟙 = right unitV
+-- The progress property asserts that
+-- a cloesd and well-typed term
+-- is either a value or can be further reduced
+progress : {p : Prog} {A : Type}
+         → ∅ ⊢ p ∷ A
+         → Σ Prog (λ q → p ↦ q) ∨ Value p
+progress ⊢ℕ = right natV
+progress ⊢𝔹 = right boolV
+progress {p = p +ₑ q} (⊢+ ⊢p:N ⊢q:N) 
+  with progress ⊢p:N
+... | left (p' , p↦p') = left (p' +ₑ q , +-left  p↦p')
+... | right (natV {m})
+  with progress ⊢q:N
+... | left (q' , q↦q') = left (p +ₑ q' , +-right q↦q')
+... | right (natV {n}) = left (nat (m + n) , +-natval)
+progress {p = p <ₑ q} (⊢< ⊢p:N ⊢q:N)
+  with progress ⊢p:N
+... | left (p' , p↦p') = left (p' <ₑ q , <-left  p↦p')
+... | right (natV {m})
+  with progress ⊢q:N
+... | left (q' , q↦q') = left (p <ₑ q' , <-right q↦q')
+... | right (natV {n})
+  with dec< m n
+... | left  m<n = left (bool true  , <-true  m<n)
+... | right n≤m = left (bool false , <-false n≤m)
+progress {p = if c then p else q} (⊢if ⊢c:B ⊢p:A ⊢q:A) 
+  with progress ⊢c:B
+... | left (c' , c↦c') = left (if c' then p else q , if-cond c↦c')
+... | right (boolV {true} ) = left (p , if-true )
+... | right (boolV {false}) = left (q , if-false)
+progress {p = ⟨ p , q ⟩} (⊢pair ⊢p:A ⊢q:B)
+  with progress ⊢p:A
+... | left (p' , p↦p') = left (⟨ p' , q ⟩ , pair-left   p↦p')
+... | right vp
+  with progress ⊢q:B
+... | left (q' , q↦q') = left (⟨ p , q' ⟩ , pair-right  q↦q')
+... | right vq = right (pairV vp vq)
+progress {p = proj0 p} (⊢proj0 ⊢p:AB)
+  with progress ⊢p:AB
+... | left (p' , p↦p') = left (proj0 p' , proj0-pair p↦p')
+... | right (pairV {p0} {p1} vp0 vp1) = left ( p0 , pair-fst )
+progress {p = proj1 p} (⊢proj1 ⊢p:AB)
+  with progress ⊢p:AB
+... | left (p' , p↦p') = left (proj1 p' , proj1-pair p↦p')
+... | right (pairV {p0} {p1} vp0 vp1) = left ( p1 , pair-snd )
+progress {p = var i} (⊢ax ())
+progress {p = abs p} (⊢abs A⊢p:A) = right lambdaV
+progress {p = p · q} (⊢app ⊢p:A⇒B ⊢q:A)
+  with progress ⊢p:A⇒B
+... | left (p' , p↦p') = left (p' · q , app-func p↦p')
+... | right (lambdaV {body}) = left ( subs body 0 q , app-beta )
+progress {p = unit} ⊢𝟙 = right unitV
