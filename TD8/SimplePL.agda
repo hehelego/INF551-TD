@@ -82,6 +82,8 @@ data Prog where
   var : Nat → Prog
   abs : Prog → Prog
   _·_ : Prog → Prog → Prog
+  -- fixed point recursion
+  fix : Prog → Prog
 
 lift : Nat → Prog → Prog
 lift n (bool x) = bool x
@@ -101,6 +103,7 @@ lift n (var x) with dec< x n
 ... | right n≤x = var (suc x)
 lift n (abs p) = let p' = lift (suc n) p in abs p'
 lift n (p · q) = let p' = lift n p ; q' = lift n q in p' · q'
+lift n (fix p) = let p' = lift (suc n) p in fix p'
 
 -- ∅ // T3 // T2 // T1 // T0 ⊢ x0 x1 x2 x3
 -- lift0: x1 x2 x3 x4 (T' T0 T1 T2 T3)
@@ -138,6 +141,9 @@ subs (abs p) n r = let n' = suc n
                        r' = lift 0 r
                     in abs (subs p n' r')
 subs (p · q) n r = let p' = subs p n r ; q' = subs q n r in p' · q'
+subs (fix p) n r = let n' = suc n
+                       r' = lift 0 r
+                    in fix (subs p n' r')
 
 
 -- TODO: this reduction relation is non-deterministic, can we show that it is confluent?
@@ -171,6 +177,9 @@ data _↦_ where
   app-func  : {p p' q : Prog} → p ↦ p' → p · q ↦ p' · q
   app-args : {p q q' : Prog} → q ↦ q' → p · q ↦ p · q'
   app-beta : {p q : Prog} → (abs p) · q ↦ (subs p 0 q)
+  -- unfold a fixed point
+  fix-body : {p p' : Prog} → p ↦ p' → fix p ↦ fix p'
+  fix-unfold : {p : Prog} → fix p ↦ subs p 0 (fix p)
 
 
 infix 10 _⊢_∷_
@@ -193,6 +202,8 @@ data _⊢_∷_ where
   ⊢ax : {Γ : Ctx} {i : Nat} {A : Type} → Lookup Γ i A → Γ ⊢ var i ∷ A
   ⊢app : {Γ : Ctx} {p q : Prog} {A B : Type} → Γ ⊢ p ∷ A ⇒ B → Γ ⊢ q ∷ A → Γ ⊢ p · q ∷ B
   ⊢abs : {Γ : Ctx} {p : Prog} {A B : Type} → Γ // A ⊢ p ∷ B → Γ ⊢ abs p ∷ A ⇒ B
+  -- fixed point
+  ⊢fix : {Γ : Ctx} {p : Prog} {A : Type} → Γ // A ⊢ p ∷ A → Γ ⊢ fix p ∷ A
 
 data Value where
   unitV : Value unit
@@ -252,6 +263,7 @@ lift-lemma {n = n} {ins = ins} {p = var i} (⊢ax lookup) with dec< i n
 ... | left  i<n = ⊢ax (lookup-lift-lt  {n = n} {ins = ins} {i<n = i<n} lookup)
 ... | right n≤i = ⊢ax (lookup-lift-geq {n = n} {ins = ins} {n≤i = n≤i} lookup)
 lift-lemma {ins = ins} (⊢abs lam) = ⊢abs (lift-lemma {ins = ins-suc ins} lam)
+lift-lemma {ins = ins} (⊢fix  mu) = ⊢fix (lift-lemma {ins = ins-suc ins}  mu)
 
 subs-lemma-n : {Γ Γ' : Ctx} {n : Nat} {p q : Prog} {X A : Type}
                {ins : Insert Γ n X Γ'}
@@ -314,9 +326,13 @@ subs-lemma-n {ins = ins} (⊢app X⊢p:A⇒B X⊢q:A) ⊢q:X =
       ⊢q:A   = subs-lemma-n {ins = ins} X⊢q:A   ⊢q:X
    in ⊢app ⊢p:A⇒B ⊢q:A
 -- abstraction
-subs-lemma-n {p = abs p} {q} {X} {A ⇒ B} {ins} (⊢abs CA⊢p:B) ⊢q:X =
+subs-lemma-n {p = abs p} {q} {X} {A ⇒ B} {ins} (⊢abs XA⊢p:B) ⊢q:X =
   let t = lift-lemma {ins = ins-zero} ⊢q:X
-   in ⊢abs (subs-lemma-n {ins = ins-suc ins} CA⊢p:B t)
+   in ⊢abs (subs-lemma-n {ins = ins-suc ins} XA⊢p:B t)
+-- fixed point
+subs-lemma-n {p = fix p} {q} {X} {A} {ins} (⊢fix XA⊢p:A) ⊢q:X =
+  let t = lift-lemma {ins = ins-zero} ⊢q:X
+   in ⊢fix (subs-lemma-n {ins = ins-suc ins} XA⊢p:A t)
 
 
 preservation : {Γ : Ctx} {A : Type} {p q : Prog}
@@ -347,7 +363,9 @@ preservation (⊢proj1 (⊢pair ⊢p:A ⊢q:B)) pair-snd = ⊢q:B
 preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-func p↦p') = let ⊢p':A⇒B = preservation ⊢p:A⇒B p↦p' in ⊢app ⊢p':A⇒B ⊢q:A
 preservation (⊢app ⊢p:A⇒B ⊢q:A) (app-args q↦q') = let ⊢q':A   = preservation ⊢q:A   q↦q' in ⊢app ⊢p:A⇒B  ⊢q':A
 preservation (⊢app (⊢abs A⊢p:B) ⊢q:A) app-beta = subs-lemma-n {ins = ins-zero} A⊢p:B ⊢q:A
-
+-- fixed point
+preservation (⊢fix A⊢p:A) (fix-body p↦p') = let A⊢p':A = preservation A⊢p:A p↦p' in ⊢fix A⊢p':A
+preservation (⊢fix A⊢p:A) fix-unfold = subs-lemma-n {ins = ins-zero} A⊢p:A (⊢fix A⊢p:A)
 
 -- The progress property asserts that
 -- a cloesd and well-typed term
@@ -395,9 +413,10 @@ progress {p = proj1 p} (⊢proj1 ⊢p:AB)
 ... | left (p' , p↦p') = left (proj1 p' , proj1-pair p↦p')
 ... | right (pairV {p0} {p1} vp0 vp1) = left ( p1 , pair-snd )
 progress {p = var i} (⊢ax ())
-progress {p = abs p} (⊢abs A⊢p:A) = right lambdaV
+progress {p = abs p} (⊢abs A⊢p:B) = right lambdaV
 progress {p = p · q} (⊢app ⊢p:A⇒B ⊢q:A)
   with progress ⊢p:A⇒B
 ... | left (p' , p↦p') = left (p' · q , app-func p↦p')
 ... | right (lambdaV {body}) = left ( subs body 0 q , app-beta )
+progress {p = fix p} (⊢fix A⊢p:A) = left ( subs p 0 (fix p) , fix-unfold )
 progress {p = unit} ⊢𝟙 = right unitV
