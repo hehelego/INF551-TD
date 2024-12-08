@@ -44,17 +44,17 @@ let rec subst (x : var) (tm : expr) : expr -> expr = function
       let ty' = subst x tm ty in
       if x = y then Abs (y, ty', u)
       else if free_var y tm then
-        let y' = fresh_var () in
-        let u' = subst y (Var y') u in
-        Abs (y', ty', subst x tm u')
+        let z = fresh_var () in
+        let u' = subst y (Var z) u in
+        Abs (z, ty', subst x tm u')
       else Abs (y, ty', subst x tm u)
   | Pi (y, ty, u) ->
       let ty' = subst x tm ty in
-      if x = y then Abs (y, ty', u)
+      if x = y then Pi (y, ty', u)
       else if free_var y tm then
-        let y' = fresh_var () in
-        let u' = subst y (Var y') u in
-        Pi (y', ty', subst x tm u')
+        let z = fresh_var () in
+        let u' = subst y (Var z) u in
+        Pi (z, ty', subst x tm u')
       else Pi (y, ty', subst x tm u)
   (* natrual numbers *)
   | Nat -> Nat
@@ -182,6 +182,7 @@ let rec normalize (ctx : context) (t : expr) : expr =
 let conv (ctx : context) (t : expr) (t' : expr) : bool =
   let t = normalize ctx t in
   let t' = normalize ctx t' in
+  Printf.printf "## Test conversion (%s) (%s)\n" (to_string t) (to_string t');
   alpha t t'
 
 let check_conv (ctx : context) (t : expr) (t' : expr) : unit =
@@ -259,3 +260,41 @@ and check (ctx : context) (tm : expr) (ty : expr) : unit =
 and check_typable (ctx : context) (tm : expr) : unit =
   let _ = infer ctx tm in
   ()
+
+let%test_unit "conversion-1" =
+  let ctx = ("Bool", (Type, None)) :: [] in
+  let u =
+    of_string "Pi (n : Nat) -> Pi (x : (fun (n : Nat) -> Nat) n) -> Bool"
+  in
+  let t = of_string "Pi (m : Nat) -> Pi (m : Nat) -> Bool" in
+  print_string "TYPE 1:  ";
+  print_endline (normalize ctx u |> to_string);
+  print_string "TYPE 2:  ";
+  print_endline (normalize ctx t |> to_string);
+  check_conv ctx u t
+
+let%test_unit "conversion-2" =
+  let ctx = [] in
+  let u =
+    of_string
+      "Pi (n : Nat) -> Pi (x : (fun (n : Nat) -> Nat) n) -> ((fun (n : Nat)-> \
+       Nat) (S n))"
+  in
+  let t = of_string "Pi (m : Nat) -> Pi (m : Nat) -> Nat" in
+  print_string "TYPE 1:  ";
+  print_endline (normalize ctx u |> to_string);
+  print_string "TYPE 2:  ";
+  print_endline (normalize ctx t |> to_string);
+  check_conv ctx u t
+
+let%test_unit "conversion-3" =
+  let ctx = ("Bool", (Type, None)) :: [] in
+  let u =
+    of_string "Pi (n : Nat) -> Pi (n : (fun (n : Nat) -> Nat) n) -> Bool"
+  in
+  let t = of_string "Pi (m : Nat) -> Pi (m : Nat) -> Bool" in
+  print_string "TYPE 1:  ";
+  print_endline (normalize ctx u |> to_string);
+  print_string "TYPE 2:  ";
+  print_endline (normalize ctx t |> to_string);
+  check_conv ctx u t
