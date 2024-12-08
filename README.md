@@ -55,14 +55,14 @@ Implement a DPLL SAT solver in OCaml.
 
 - type checking and type inference of simply typed lambda calculus (STLC)
 - interactively constructing proofs and proof terms with tactics
-- naive implementation of dependent type theory **WIP**
+- naive implementation of dependent type theory
   - dependent products (dependent type functions)
   - natural numbers
   - homogeneous equality
-  - W-types for defining inductive type
-  - layered type universes
+  - W-types for defining inductive type **WIP**
+  - layered type universes **WIP**
 - another proof assistance based on dependent type theory
-- exploring paradoxes in the proof assistance
+- exploring paradoxes in the proof assistance **WIP**
 
 ## TD5 propositional logic in Agda
 
