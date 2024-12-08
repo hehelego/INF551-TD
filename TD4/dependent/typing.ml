@@ -28,7 +28,9 @@ let rec free_var (x : var) : expr -> bool = function
       free_var x p || free_var x z || free_var x s || free_var x n
   | Eq (t, u) -> free_var x t || free_var x u
   | Refl e -> free_var x e
-  | J _ -> assert false
+  | J (p, p_refl, s, t, s_eq_t) ->
+      free_var x p || free_var x p_refl || free_var x s || free_var x t
+      || free_var x s_eq_t
 
 (** [subst x t u] replaces all free occurence of [x] in [u] with [t] *)
 let rec subst (x : var) (tm : expr) : expr -> expr = function
@@ -70,14 +72,42 @@ let rec subst (x : var) (tm : expr) : expr -> expr = function
       let u' = subst x tm u in
       Eq (t', u')
   | Refl e -> Refl (subst x tm e)
-  | J _ -> assert false
+  | J (p, p_refl, s, t, eq) ->
+      let p' = subst x tm p in
+      let p_refl' = subst x tm p_refl in
+      let s' = subst x tm s in
+      let t' = subst x tm t in
+      let eq' = subst x tm eq in
+      J (p', p_refl', s', t', eq')
 
-let string_of_context (ctx : context) : string =
-  ctx
-  |> List.map (fun (x, (ty, _)) ->
-         let str_ty = to_string ty in
-         fmt "%s : %s" x str_ty)
-  |> String.concat "\n"
+(** test if two terms are equivalent up-to alpha-renaming *)
+let rec alpha (tm : expr) (tm' : expr) : bool =
+  match (tm, tm') with
+  | Type, Type -> true
+  | Var x, Var y -> x = y
+  | App (t, u), App (t', u') -> alpha t t' && alpha u u'
+  | Abs (x, t, u), Abs (y, t', u') ->
+      alpha t t'
+      &&
+      let z = Var (fresh_var ()) in
+      let v, v' = (subst x z u, subst y z u') in
+      alpha v v'
+  | Pi (x, t, u), Pi (y, t', u') ->
+      alpha t t'
+      &&
+      let z = Var (fresh_var ()) in
+      let v, v' = (subst x z u, subst y z u') in
+      alpha v v'
+  | Nat, Nat -> true
+  | Z, Z -> true
+  | S n, S n' -> alpha n n'
+  | Ind (p, z, s, n), Ind (p', z', s', n') ->
+      alpha p p' && alpha z z' && alpha s s' && alpha n n'
+  | Eq (t, u), Eq (t', u') -> alpha t t' && alpha u u'
+  | Refl e, Refl e' -> alpha e e'
+  | J (p, r, x, y, eq), J (p', r', x', y', eq') ->
+      alpha p p' && alpha r r' && alpha x x' && alpha y y' && alpha eq eq'
+  | _ -> false
 
 (** Reducing a term one step further if it is possible.
     Precondition: the input term is well-typed and have no free variable not in the context
@@ -130,42 +160,23 @@ let rec reduce (ctx : context) : expr -> expr option = function
           match reduce ctx u with Some u' -> Some (Eq (t, u')) | None -> None))
   | Refl e -> (
       match reduce ctx e with Some e' -> Some (Refl e') | None -> None)
-  | J _ -> assert false
+  | J (p, p_refl, s, t, eq) -> (
+      match reduce ctx s with
+      | Some s' -> Some (J (p, p_refl, s', t, eq))
+      | None -> (
+          match reduce ctx t with
+          | Some t' -> Some (J (p, p_refl, s, t', eq))
+          | None -> (
+              match reduce ctx eq with
+              | Some eq' -> Some (J (p, p_refl, s, t, eq'))
+              | None ->
+                  if alpha s t && alpha eq (Refl s) then Some (App (p_refl, s))
+                  else None)))
 
 (** Normalizing a term by repeatedly reducing it
  NOTE: this function may not terminate *)
 let rec normalize (ctx : context) (t : expr) : expr =
   match reduce ctx t with Some t' -> normalize ctx t' | None -> t
-
-(** test if two terms are equivalent up-to alpha-renaming *)
-let rec alpha (tm : expr) (tm' : expr) : bool =
-  match (tm, tm') with
-  | Type, Type -> true
-  | Var x, Var y -> x = y
-  | App (t, u), App (t', u') -> alpha t t' && alpha u u'
-  | Abs (x, t, u), Abs (y, t', u') ->
-      alpha t t'
-      &&
-      let z = Var (fresh_var ()) in
-      let v, v' = (subst x z u, subst y z u') in
-      alpha v v'
-  | Pi (x, t, u), Pi (y, t', u') ->
-      alpha t t'
-      &&
-      let z = Var (fresh_var ()) in
-      let v, v' = (subst x z u, subst y z u') in
-      alpha v v'
-  | Nat, Nat -> true
-  | Z, Z -> true
-  | S n, S n' -> alpha n n'
-  | Ind (p, z, s, n), Ind (p', z', s', n') ->
-      alpha p p' && alpha z z' && alpha s s' && alpha n n'
-  | Eq (t, u), Eq (t', u') -> alpha t t' && alpha u u'
-  | Refl e, Refl e' -> alpha e e'
-  | J _, J _ ->
-      (* TODO: handle this case properly *)
-      assert false
-  | _ -> false
 
 (** test whether two terms are alpha-beta convertible under a context *)
 let conv (ctx : context) (t : expr) (t' : expr) : bool =
@@ -227,7 +238,19 @@ let rec infer (ctx : context) : expr -> expr = function
   | Refl e ->
       check_typable ctx e;
       Eq (e, e)
-  | J _ -> assert false
+  | J (p, r, x, y, eq) ->
+      let j_type x y eq = App (App (App (p, x), y), eq) in
+      (* x and y are of the same type *)
+      let a = infer ctx x in
+      check ctx y a;
+      (* p: (x y : A) -> x = y -> Type
+         eq: x=y
+         r: (x:A) -> p x x (Refl x) *)
+      let eq_pred = Pi ("x=y", Eq (x, y), Type) in
+      check ctx p (Pi ("x", a, Pi ("y", a, eq_pred)));
+      check ctx r (Pi ("x", a, j_type (Var "x") (Var "x") (Refl (Var "x"))));
+      check ctx eq (Eq (x, y));
+      j_type x y eq
 
 and check (ctx : context) (tm : expr) (ty : expr) : unit =
   let ty' = infer ctx tm in

@@ -22,5 +22,14 @@ let rec to_string : expr -> string = function
         (to_string n)
   (* equality types *)
   | Eq (t, u) -> fmt "(%s = %s)" (to_string t) (to_string u)
-  | Refl e -> fmt "(refl %s)" (to_string e)
-  | J _ -> assert false
+  | Refl e -> fmt "(Refl %s)" (to_string e)
+  | J (p, p_refl, x, y, eq) ->
+      fmt "(J %s %s %s %s %s)" (to_string p) (to_string p_refl) (to_string x)
+        (to_string y) (to_string eq)
+
+let string_of_context (ctx : context) : string =
+  ctx
+  |> List.map (fun (x, (ty, _)) ->
+         let str_ty = to_string ty in
+         fmt "%s : %s" x str_ty)
+  |> String.concat "\n"
