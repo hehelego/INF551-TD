@@ -182,7 +182,6 @@ let rec normalize (ctx : context) (t : expr) : expr =
 let conv (ctx : context) (t : expr) (t' : expr) : bool =
   let t = normalize ctx t in
   let t' = normalize ctx t' in
-  Printf.printf "## Test conversion (%s) (%s)\n" (to_string t) (to_string t');
   alpha t t'
 
 let check_conv (ctx : context) (t : expr) (t' : expr) : unit =
