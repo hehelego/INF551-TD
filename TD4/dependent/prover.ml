@@ -5,23 +5,31 @@ open Typing
 
 let () = Printexc.record_backtrace true
 
+let split c s =
+  try
+    let n = String.index s c in
+    ( String.trim (String.sub s 0 n),
+      String.trim (String.sub s (n + 1) (String.length s - (n + 1))) )
+  with Not_found -> (s, "")
+
+let rec next_command acc =
+  let s = input_line stdin |> String.trim in
+  let n = String.length s in
+  if String.ends_with ~suffix:" \\" s then
+    let s' = String.sub s 0 (n - 1) |> String.trim in
+    acc ^ " " ^ s' |> next_command
+  else acc ^ " " ^ s
+
 let () =
   let env = ref [] in
   let loop = ref true in
   let file = open_out "interactive.proof" in
-  let split c s =
-    try
-      let n = String.index s c in
-      ( String.trim (String.sub s 0 n),
-        String.trim (String.sub s (n + 1) (String.length s - (n + 1))) )
-    with Not_found -> (s, "")
-  in
   while !loop do
     try
       print_string "? ";
       flush_all ();
       let cmd, arg =
-        let cmd = input_line stdin in
+        let cmd = next_command "" in
         output_string file (cmd ^ "\n");
         print_endline cmd;
         split ' ' cmd
