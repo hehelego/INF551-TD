@@ -1,0 +1,12 @@
+define nat_id = fun (n : Nat) -> n
+define nat_fst = fun (m : Nat) -> fun (n : Nat) -> m
+define pred = fun (n : Nat) -> Ind nat_id 0 nat_fst n
+
+eval pred Z
+eval pred (S (S (S Z)))
+
+define add = fun (m : Nat) -> fun (n : Nat) -> Ind nat_id n (fun (_m : Nat) -> fun (s : Nat) -> S s) m
+
+eval add (S (S (S Z))) (S (S Z))
+
+exit
