@@ -4,18 +4,23 @@ eval pred Z
 eval pred (S (S (S Z)))
 
 
-define add = fun (m : Nat) -> fun (n : Nat) -> Ind (fun (n : Nat) -> Nat) n (fun (m : Nat) -> fun (s : Nat) -> S s) m
+define add = fun (m : Nat) -> fun (n : Nat) \
+          -> Ind \
+             (fun (n : Nat) -> Nat) \
+             n \
+             (fun (m : Nat) -> fun (s : Nat) -> S s) \
+             m
 eval add (S (S (S Z))) (S (S Z))
 
-define mul = fun (m : Nat) -> fun (n : Nat) -> Ind (fun (n : Nat) -> Nat) Z (fun (m : Nat) -> fun (s : Nat) -> add n s) m
-define mul = fun (m : Nat) -> fun (n : Nat) -> Ind (fun (n : Nat) -> Nat) Z (fun (m : Nat) -> fun (m : Nat) -> add n m) m
+define mul = fun (m : Nat) -> fun (n : Nat) \
+          -> Ind \
+             (fun (n : Nat) -> Nat) \
+             Z \
+             (fun (m : Nat) -> fun (s : Nat) -> add n s) \
+             m
 eval mul Z (S (S (S Z)))
 eval mul (S (S (S Z))) Z
 eval mul (S (S (S Z))) (S (S Z))
-
-
-(n : Nat) -> (IH : Nat) -> Nat
-(m : Nat) -> (m : Nat) -> Nat
 
 
 define SeqPred = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> S x = S y
@@ -23,15 +28,23 @@ define sxEQsx = fun (x : Nat) -> Refl (S x)
 define Seq = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> J SeqPred sxEQsx x y eq
 check Seq = Pi (x : Nat) -> Pi (y : Nat) -> Pi (e : x = y) -> S x = S y
 
+
 define zadd = fun (n : Nat) -> Refl n
 check zadd = Pi (n : Nat) -> add Z n = n
 
-define addzPred = fun (n : Nat) -> add n Z = n
-define addzIndStep = fun (n : Nat) -> fun (eq : add n Z = n) -> Seq (add n Z) n eq
-define addz = fun (n : Nat) -> Ind addzPred (Refl Z) addzIndStep n
-check addz = Pi (n : Nat) -> add n Z = n
+define congType = Pi (T : Type) -> Pi (U : Type) -> Pi (f : T => U) \
+               -> Pi (x : T) -> Pi (y : T) -> x = y => f x = f y
+define cong = fun (T : Type) -> fun (U : Type) -> fun (f : T => U) \
+           -> fun (x : T) -> fun (y : T) -> fun (eq : x = y) \
+           -> J \
+                 (fun (x : T) -> fun (y : T) -> fun (eq : x = y) -> f x = f y) \
+                 (fun (x : T) -> Refl (f x)) \
+                 x \
+                 y \
+                 eq
+check cong = congType
+
+exit
 
 # add-assoc, add-comm
 # mul-assoc, mul-comm
-
-exit
