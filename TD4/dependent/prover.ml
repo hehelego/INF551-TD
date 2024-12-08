@@ -60,7 +60,9 @@ let () =
     with
     | End_of_file -> loop := false
     | Failure err -> print_endline ("Error: " ^ err ^ ".")
-    | Type_error err -> print_endline ("Typing error :" ^ err ^ ".")
+    | Type_error err ->
+        Printexc.print_backtrace stderr;
+        print_endline ("Typing error :" ^ err ^ ".")
     | Parsing.Parse_error -> print_endline "Parsing error."
   done;
   print_endline "Bye."

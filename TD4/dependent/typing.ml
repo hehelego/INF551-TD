@@ -1,6 +1,8 @@
 open Expr
 open Parse_unparse
 
+let () = Printexc.record_backtrace true
+
 exception Type_error of string
 
 let fresh_var : unit -> string =
@@ -22,7 +24,8 @@ let rec free_var (x : var) : expr -> bool = function
   | Nat -> false
   | Z -> false
   | S n -> free_var x n
-  | Ind _ -> assert false
+  | Ind (p, z, s, n) ->
+      free_var x p || free_var x z || free_var x s || free_var x n
   | Eq (t, u) -> free_var x t || free_var x u
   | Refl e -> free_var x e
   | J _ -> assert false
@@ -55,7 +58,12 @@ let rec subst (x : var) (tm : expr) : expr -> expr = function
   | Nat -> Nat
   | Z -> Z
   | S n -> S (subst x tm n)
-  | Ind _ -> assert false
+  | Ind (p, z, s, n) ->
+      let p' = subst x tm p in
+      let z' = subst x tm z in
+      let s' = subst x tm s in
+      let n' = subst x tm n in
+      Ind (p', z', s', n')
   (* (* equality types *) *)
   | Eq (t, u) ->
       let t' = subst x tm t in
@@ -107,7 +115,14 @@ let rec reduce (ctx : context) : expr -> expr option = function
   | Nat -> None
   | Z -> None
   | S n -> ( match reduce ctx n with Some n' -> Some (S n') | None -> None)
-  | Ind _ -> assert false
+  | Ind (_p, z, _s, Z) -> Some z
+  | Ind (p, z, s, S n) ->
+      let ih = Ind (p, z, s, n) in
+      Some (App (App (s, n), ih))
+  | Ind (p, z, s, n) -> (
+      match reduce ctx n with
+      | Some n' -> Some (Ind (p, z, s, n'))
+      | None -> None)
   | Eq (t, u) -> (
       match reduce ctx t with
       | Some t' -> Some (Eq (t', u))
@@ -140,6 +155,16 @@ let rec alpha (tm : expr) (tm' : expr) : bool =
       let z = Var (fresh_var ()) in
       let v, v' = (subst x z u, subst y z u') in
       alpha v v'
+  | Nat, Nat -> true
+  | Z, Z -> true
+  | S n, S n' -> alpha n n'
+  | Ind (p, z, s, n), Ind (p', z', s', n') ->
+      alpha p p' && alpha z z' && alpha s s' && alpha n n'
+  | Eq (t, u), Eq (t', u') -> alpha t t' && alpha u u'
+  | Refl e, Refl e' -> alpha e e'
+  | J _, J _ ->
+      (* TODO: handle this case properly *)
+      assert false
   | _ -> false
 
 (** test whether two terms are alpha-beta convertible under a context *)
@@ -170,8 +195,8 @@ let rec infer (ctx : context) : expr -> expr = function
             (Type_error (fmt "expecting a function, found %s" (to_string ty))))
   | Abs (x, arg, ret) ->
       let ctx' = (x, (arg, None)) :: ctx in
-      let ret' = infer ctx' ret in
-      Pi (x, arg, ret')
+      let ty_ret = infer ctx' ret in
+      Pi (x, arg, ty_ret)
   | Pi (x, arg, ret) ->
       check_typable ctx arg;
       let ctx' = (x, (arg, None)) :: ctx in
@@ -182,7 +207,18 @@ let rec infer (ctx : context) : expr -> expr = function
   | S n ->
       check ctx n Nat;
       Nat
-  | Ind _ -> assert false
+  | Ind (p, z, s, n) -> (
+      check ctx n Nat;
+      match infer ctx p with
+      | Pi (_x, Nat, Type) ->
+          let p_z = App (p, Z) in
+          check ctx z p_z;
+          let p_n = App (p, Var "n") in
+          let p_sn = App (p, S (Var "n")) in
+          let ty_s_expect = Pi ("n", Nat, Pi ("IH", p_n, p_sn)) in
+          check ctx s ty_s_expect;
+          normalize ctx (App (p, n))
+      | _ -> raise (Type_error "Ind expects a predicate over Nat"))
   | Eq (t, u) ->
       let tt = infer ctx t in
       let tu = infer ctx u in
