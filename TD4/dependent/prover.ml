@@ -1,3 +1,4 @@
+open NaiveDT
 open Expr
 open Parse_unparse
 open Typing

@@ -1,5 +1,13 @@
 (ocamllex lexer)
 (ocamlyacc parser)
+(library
+  (name NaiveDT)
+  (modules typing expr parse_unparse parser lexer)
+  (inline_tests)
+  (preprocess (pps ppx_inline_test))
+)
 (executable
  (name prover)
+ (modules prover)
+ (libraries NaiveDT)
 )
