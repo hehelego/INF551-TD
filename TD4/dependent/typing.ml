@@ -261,8 +261,10 @@ let rec infer (ctx : context) : expr -> expr = function
       j_type x y eq
 
 and check (ctx : context) (tm : expr) (ty : expr) : unit =
-  let ty' = infer ctx tm in
-  check_conv ctx ty ty'
+  let ty_ty = infer ctx ty in
+  check_conv ctx ty_ty Type;
+  let ty_tm = infer ctx tm in
+  check_conv ctx ty ty_tm
 
 and check_typable (ctx : context) (tm : expr) : unit =
   let _ = infer ctx tm in
@@ -305,6 +307,11 @@ let%test_unit "conversion-3" =
   print_string "TYPE 2:  ";
   print_endline (normalize ctx t |> to_string);
   check_conv ctx u t
+
+let%test_unit "infer-0" =
+  let f = Abs ("x", Nat, S (Var "x")) in
+  let t = Pi ("x", Nat, Nat) in
+  check [] f t
 
 let%test_unit "infer-1" =
   let ctx =
