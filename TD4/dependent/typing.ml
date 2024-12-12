@@ -165,17 +165,24 @@ let rec reduce (ctx : context) : expr -> expr option = function
   | Refl e -> (
       match reduce ctx e with Some e' -> Some (Refl e') | None -> None)
   | J (p, p_refl, s, t, eq) -> (
-      match reduce ctx s with
-      | Some s' -> Some (J (p, p_refl, s', t, eq))
+      match reduce ctx p with
+      | Some p' -> Some (J (p', p_refl, s, t, eq))
       | None -> (
-          match reduce ctx t with
-          | Some t' -> Some (J (p, p_refl, s, t', eq))
+          match reduce ctx p_refl with
+          | Some p_refl' -> Some (J (p, p_refl', s, t, eq))
           | None -> (
-              match reduce ctx eq with
-              | Some eq' -> Some (J (p, p_refl, s, t, eq'))
-              | None ->
-                  if alpha s t && alpha eq (Refl s) then Some (App (p_refl, s))
-                  else None)))
+              match reduce ctx s with
+              | Some s' -> Some (J (p, p_refl, s', t, eq))
+              | None -> (
+                  match reduce ctx t with
+                  | Some t' -> Some (J (p, p_refl, s, t', eq))
+                  | None -> (
+                      match reduce ctx eq with
+                      | Some eq' -> Some (J (p, p_refl, s, t, eq'))
+                      | None ->
+                          if alpha s t && alpha eq (Refl s) then
+                            Some (App (p_refl, s))
+                          else None)))))
 
 (** Normalizing a term by repeatedly reducing it
  NOTE: this function may not terminate *)
@@ -224,14 +231,22 @@ let rec infer (ctx : context) : expr -> expr = function
       check ctx n Nat;
       Nat
   | Ind (p, z, s, n) -> (
+      (*
+      p : Nat -> Type
+      z : p 0
+      s : (n : Nat) -> (IH : p n) -> p (n + 1)
+      n : Nat
+      *)
       check ctx n Nat;
       match infer ctx p |> normalize ctx with
       | Pi (_x, Nat, Type) ->
           let p_z = App (p, Z) in
           check ctx z p_z;
-          let p_n = App (p, Var "n") in
-          let p_sn = App (p, S (Var "n")) in
-          let ty_s_expect = Pi ("n", Nat, Pi ("IH", p_n, p_sn)) in
+          (* use a fresh variable to avoid capturing since [p] may contain free variable *)
+          let y = fresh_var () in
+          let p_n = App (p, Var y) in
+          let p_sn = App (p, S (Var y)) in
+          let ty_s_expect = Pi (y, Nat, Pi ("IH", p_n, p_sn)) in
           check ctx s ty_s_expect;
 
           App (p, n)
@@ -254,9 +269,12 @@ let rec infer (ctx : context) : expr -> expr = function
       (* p: (x y : A) -> x = y -> Type
          eq: x=y
          r: (x:A) -> p x x (Refl x) *)
-      let eq_pred = Pi ("x=y", Eq (x, y), Type) in
-      check ctx p (Pi ("x", a, Pi ("y", a, eq_pred)));
-      check ctx r (Pi ("x", a, j_type (Var "x") (Var "x") (Refl (Var "x"))));
+      let s = fresh_var () in
+      let t = fresh_var () in
+      let vs, vt = (Var s, Var t) in
+      let eq_pred = Pi ("_", Eq (vs, vt), Type) in
+      check ctx p (Pi (s, a, Pi (t, a, eq_pred)));
+      check ctx r (Pi (s, a, j_type vs vs (Refl vs)));
       check ctx eq (Eq (x, y));
       j_type x y eq
 
