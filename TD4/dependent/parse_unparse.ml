@@ -18,7 +18,7 @@ let rec to_string : expr -> string = function
   | Z -> "Z"
   | S n -> fmt "(S %s)" (to_string n)
   | Ind (p, base, step, n) ->
-      fmt "(Ins %s %s %s %s)" (to_string p) (to_string base) (to_string step)
+      fmt "(Ind %s %s %s %s)" (to_string p) (to_string base) (to_string step)
         (to_string n)
   (* equality types *)
   | Eq (t, u) -> fmt "(%s = %s)" (to_string t) (to_string u)
