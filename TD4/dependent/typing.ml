@@ -1,6 +1,11 @@
 open Expr
 open Parse_unparse
 
+module Debug_runtime =
+  Minidebug_runtime.PrintBox
+    ((val Minidebug_runtime.shared_config "debugger_printbox.log"))
+
+let () = Debug_runtime.config.values_first_mode <- true
 let () = Printexc.record_backtrace true
 
 exception Type_error of string
@@ -81,7 +86,7 @@ let rec subst (x : var) (tm : expr) : expr -> expr = function
       J (p', p_refl', s', t', eq')
 
 (** test if two terms are equivalent up-to alpha-renaming *)
-let rec alpha (tm : expr) (tm' : expr) : bool =
+let%track_show rec alpha (tm : expr) (tm' : expr) : bool =
   match (tm, tm') with
   | Type, Type -> true
   | Var x, Var y -> x = y

@@ -4,7 +4,8 @@
   (name NaiveDT)
   (modules typing expr parse_unparse parser lexer)
   (inline_tests)
-  (preprocess (pps ppx_inline_test))
+  (preprocess (pps ppx_inline_test ppx_minidebug ppx_deriving.show))
+  (libraries ppx_minidebug.runtime)
 )
 (executable
  (name prover)

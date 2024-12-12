@@ -1,4 +1,4 @@
-type var = string
+type var = string [@@deriving show { with_path = false }]
 (** Variables. *)
 
 (** Expressions. *)
@@ -20,5 +20,7 @@ type expr =
   | Eq of expr * expr
   | Refl of expr
   | J of expr * expr * expr * expr * expr
+[@@deriving show { with_path = false }]
 
 type context = (var * (expr * expr option)) list
+[@@deriving show { with_path = false }]
