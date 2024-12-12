@@ -209,13 +209,14 @@ let rec infer (ctx : context) : expr -> expr = function
           raise
             (Type_error (fmt "expecting a function, found %s" (to_string ty))))
   | Abs (x, arg, ret) ->
+      check ctx arg Type;
       let ctx' = (x, (arg, None)) :: ctx in
       let ty_ret = infer ctx' ret in
       Pi (x, arg, ty_ret)
   | Pi (x, arg, ret) ->
-      check_typable ctx arg;
+      check ctx arg Type;
       let ctx' = (x, (arg, None)) :: ctx in
-      check_typable ctx' ret;
+      check ctx' ret Type;
       Type
   | Nat -> Type
   | Z -> Nat
