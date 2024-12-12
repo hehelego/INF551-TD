@@ -124,7 +124,6 @@ let rec reduce (ctx : context) : expr -> expr option = function
       | Some (_ty, value) -> value
       | None -> raise (Type_error (fmt "%s not in scope in reduction" x)))
   | App (Abs (x, _t, u), v) -> Some (subst x v u)
-  | App (Pi (x, _t, u), v) -> Some (subst x v u)
   | App (t, u) -> (
       match reduce ctx t with
       | Some t' -> Some (App (t', u))
@@ -202,7 +201,7 @@ let rec infer (ctx : context) : expr -> expr = function
       | Some (ty, _) -> ty
       | None -> raise (Type_error (fmt "variable %s not in context" v)))
   | App (t, u) -> (
-      match infer ctx t with
+      match infer ctx t |> normalize ctx with
       | Pi (x, arg, ret) ->
           check ctx u arg;
           subst x u ret
@@ -225,7 +224,7 @@ let rec infer (ctx : context) : expr -> expr = function
       Nat
   | Ind (p, z, s, n) -> (
       check ctx n Nat;
-      match infer ctx p with
+      match infer ctx p |> normalize ctx with
       | Pi (_x, Nat, Type) ->
           let p_z = App (p, Z) in
           check ctx z p_z;
@@ -233,8 +232,11 @@ let rec infer (ctx : context) : expr -> expr = function
           let p_sn = App (p, S (Var "n")) in
           let ty_s_expect = Pi ("n", Nat, Pi ("IH", p_n, p_sn)) in
           check ctx s ty_s_expect;
-          normalize ctx (App (p, n))
-      | _ -> raise (Type_error "Ind expects a predicate over Nat"))
+
+          App (p, n)
+      | ty ->
+          let msg = fmt "Ind expects a Nat -> Type. Actual %s" (to_string ty) in
+          raise (Type_error msg))
   | Eq (t, u) ->
       let tt = infer ctx t in
       let tu = infer ctx u in
@@ -302,3 +304,54 @@ let%test_unit "conversion-3" =
   print_string "TYPE 2:  ";
   print_endline (normalize ctx t |> to_string);
   check_conv ctx u t
+
+let%test_unit "infer-1" =
+  let ctx =
+    [ ("add", (Pi ("x", Nat, Pi ("y", Nat, Nat)), None)); ("x", (Nat, None)) ]
+  in
+  let raw_text =
+    "fun (x : Nat) -> Pi (y : Nat) -> Pi (z : Nat) -> add (add x y) z = add x \
+     (add y z)"
+  in
+  let f = of_string raw_text in
+  check ctx f (of_string "Nat => Type");
+
+  let ctx = ("F", (Pi ("_", Nat, Type), Some f)) :: ctx in
+
+  let raw_text = "fun (x : Nat) -> fun (IH : F x) -> IH Z" in
+  let g = of_string raw_text in
+  let t = infer ctx g in
+  print_endline ("type of g is " ^ to_string t);
+  ()
+
+let%test_unit "infer depdent function" =
+  let ctx =
+    [ ("add", (Pi ("x", Nat, Pi ("y", Nat, Nat)), None)); ("x", (Nat, None)) ]
+  in
+  let add p q =
+    let t = App (Var "add", p) in
+    App (t, q)
+  in
+  let a0 = add (add (Var "x") (Var "y")) (Var "z") in
+  let a1 = add (Var "x") (add (Var "y") (Var "z")) in
+  (* fun(x : N) -> Pi(y : N) -> Pi(z : N) -> (x+y)+z = x+(y+z) *)
+  let f = Abs ("x", Nat, Pi ("y", Nat, Pi ("z", Nat, Eq (a0, a1)))) in
+
+  check ctx f (Pi ("_", Nat, Type));
+  let ctx = ("F", (Pi ("_", Nat, Type), Some f)) :: ctx in
+  let ctx = ("n", (Nat, None)) :: ctx in
+
+  (* fun(r : F n) -> r Z (S Z) *)
+  let g =
+    Abs
+      ( (* var *)
+        "r",
+        (* type *)
+        App (Var "F", Var "n"),
+        (* body *)
+        App (App (Var "r", Z), S Z) )
+  in
+  let a0 = add (add (Var "n") Z) (S Z) in
+  let a1 = add (Var "n") (add Z (S Z)) in
+  let ty_g = Pi ("rr", App (Var "F", Var "n"), Eq (a0, a1)) in
+  check ctx g ty_g
