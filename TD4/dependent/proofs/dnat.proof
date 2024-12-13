@@ -61,6 +61,20 @@ define trans = fun (T : Type) ->
                        x y xy) yz;;
 check trans = transType;;
 
+define symType = Pi (T : Type) ->
+                   Pi (x : T) -> Pi (y : T) ->
+                     Pi (e : x = y) ->
+                       y = x;;
+define sym = fun (T : Type) ->
+               fun (x : T) -> fun (y : T) ->
+                 fun (e : x = y) ->
+                   J
+                     (fun (x : T) -> fun (y : T) -> fun (e : x = y) -> y = x)
+                     (fun (x : T) -> Refl x)
+                     x y e;;
+check sym = symType;;
+
+
 # 0 is left/right netural element of addition
 define zadd = fun (n : Nat) -> Refl n;;
 check zadd =  Pi (n : Nat) -> (add Z n = n);;
@@ -131,8 +145,158 @@ define addComm = fun (x : Nat) -> fun (y : Nat) ->
                         (congSuc (add x y) (add y x) IH)
                      )
                      y ;;
-# check addComm = addCommTypeAssocType ;;
-exit;;
+check addComm = addCommType;;
 
 # mul-assoc, mul-comm
+define N = Nat;;
+define distribute = fun (m : N) -> fun (n : N) -> fun (p : N) ->
+                      Ind
+                        (fun (m : N) -> mul (add m n) p = add (mul m p) (mul n p))
+                        (Refl (mul n p))
+                        (fun (m : N) -> fun (IH : mul (add m n) p = add (mul m p) (mul n p)) ->
+                           trans Nat
+                             # x y z
+                             (mul (add (S m) n) p)
+                             (add p (add (mul m p) (mul n p)))
+                             (add (mul (S m) p) (mul n p))
+                             # eqaulities
+                             (cong Nat Nat
+                               (fun (x : Nat) -> add p x)
+                               (mul (add m n) p)
+                               (add (mul m p) (mul n p))
+                               IH)
+                             (sym Nat
+                               # value x
+                               (add (mul (S m) p) (mul n p))
+                               # value y
+                               (add p (add (mul m p) (mul n p)))
+                               # equality
+                               (addAssoc p (mul m p) (mul n p)))
+                        )
+                        m ;;
+
+check distribute = Pi (m : N) -> Pi (n : N) -> Pi (p : N) ->
+                     mul (add m n) p = add (mul m p) (mul n p);;
+
+define mulAssoc = fun (m : N) -> fun (n : N) -> fun (p : N) ->
+                    Ind
+                      (fun (m : N) -> mul (mul m n) p = mul m (mul n p))
+                      (Refl Z)
+                      (fun (m : N) -> fun (IH : mul (mul m n) p = mul m (mul n p)) ->
+                         trans N
+                           # x y z
+                           (mul (mul (S m) n) p)
+                           # (S m * n) * p
+                           # (n + m * n) * p
+                           # (n * p) + (m * n * p)
+                           (add (mul n p) (mul (mul m n) p))
+                           (mul (S m) (mul n p))
+                           # x=y y=z
+                           (distribute n (mul m n) p)
+                           (cong N N (fun (x : N) -> add (mul n p) x)
+                             (mul (mul m n) p)
+                             (mul m (mul n p))
+                             IH)
+                      )
+                      m;;
+check mulAssoc = Pi (m : N) -> Pi (n : N) -> Pi (p : N) ->
+                   mul (mul m n) p = mul m (mul n p);;
+
+define mulZ = fun (n : N) ->
+                Ind
+                  (fun (n : N) -> Z = mul n Z)
+                  (Refl Z)
+                  (fun (n : N) -> fun (IH : Z = mul n Z) ->
+                     cong N N (fun (x : N) -> add Z x)
+                       Z (mul n Z)
+                       IH)
+                  n;;
+check mulZ = Pi (n : N) -> Z = mul n Z;;
+
+define I = S Z;;
+
+define mulIr = fun (n : N) ->
+                 Ind (fun (n : N) -> n = mul n I)
+                   (Refl Z)
+                   (fun (n : N) -> fun (IH : n = mul n I) ->
+                      congSuc n (mul n I) IH
+                   )
+                   n;;
+check mulIr = Pi (m : N) -> m = mul m I;;
+
+define mulS = fun (m : N) -> fun (p : N) ->
+                Ind (fun (m : N) -> mul m (S p) = add (mul m I) (mul m p))
+                  (Refl Z)
+                  (fun (m : N) -> fun (IH : mul m (S p) = add (mul m I) (mul m p)) ->
+                    congSuc
+                      (add p (mul m (S p)))
+                      (add (mul m I) (add p (mul m p)))
+                      # equality
+                      (trans N
+                        (add p (mul m (S p)))
+                        (add p (add (mul m I) (mul m p)))
+                        (add (mul m I) (add p (mul m p)))
+                        # cong (p +_) (lemma m p)
+                        (cong N N (fun (x : N) -> add p x)
+                          (mul m (S p))
+                          (add (mul m I) (mul m p))
+                          IH)
+                        (trans N
+                          (add p (add (mul m I) (mul m p)))
+                          (add (add p (mul m I)) (mul m p))
+                          (add (mul m I) (add p (mul m p)))
+                          # sym (+-assoc p (m * 1) (m * p))
+                          (sym N
+                            (add (add p (mul m I)) (mul m p))
+                            (add p (add (mul m I) (mul m p)))
+                            (addAssoc p (mul m I) (mul m p)))
+                          (trans N
+                            (add (add p (mul m I)) (mul m p))
+                            (add (add (mul m I) p) (mul m p))
+                            (add (mul m I) (add p (mul m p)))
+                            # cong (_+ m * p) (+-comm p (m * 1))
+                            (cong N N (fun (x : N) -> add x (mul m p))
+                              (add p (mul m I))
+                              (add (mul m I) p)
+                              (addComm p (mul m I)))
+                            # +-assoc (m * 1) p (m * p)
+                            (addAssoc (mul m I) p (mul m p)))))
+                  )
+                  m;;
+check mulS = Pi (m : N) -> Pi (p : N) ->
+               mul m (S p) = add (mul m I) (mul m p);;
+define symMulS = fun (m : N) -> fun (p : N) ->
+                    sym N
+                      (mul m (S p)) (add (mul m I) (mul m p))
+                      (mulS m p);;
+check symMulS = Pi (m : N) -> Pi (p : N) ->
+                  add (mul m I) (mul m p) = mul m (S p);;
+
+define mulComm = fun (m : N) -> fun (n : N) ->
+                   Ind
+                     (fun (m : N) -> mul m n = mul n m)
+                     (mulZ n)
+                     (fun (m : N) -> fun (IH : mul m n = mul n m) ->
+                        # cong (n +_) (*-comm m n)
+                        trans N
+                          (add n (mul m n))
+                          (add n (mul n m))
+                          (mul n (S m))
+                          # equalities
+                          (cong N N (fun (x : N) -> add n x)
+                             (mul m n) (mul n m) IH)
+                          # cong (_+ n * m) (*-id n)
+                          (trans N
+                             (add n (mul n m))
+                             (add (mul n I) (mul n m))
+                             (mul n (S m))
+                             # equalities
+                             (cong N N (fun (x : N) -> add x (mul n m))
+                                n (mul n I) (mulIr n))
+                             (symMulS n m)
+                          )
+                     )
+                     m;;
+check mulComm = Pi (m : N) -> Pi (n : N) ->
+                   mul m n = mul n m;;
 exit;;
