@@ -117,72 +117,52 @@ let%track_show rec alpha (tm : expr) (tm' : expr) : bool =
 (** Reducing a term one step further if it is possible.
     Precondition: the input term is well-typed and have no free variable not in the context
  *)
-let rec reduce (ctx : context) : expr -> expr option = function
+let rec reduce (ctx : context) (e : expr) : expr option =
+  let ( >> ) opt f = Option.map f opt in
+  let ( let* ) opt f = match opt with Some x -> Some x | None -> f () in
+  match e with
   | Type -> None
   | Var x -> (
       match List.assoc_opt x ctx with
       | Some (_ty, value) -> value
       | None -> raise (Type_error (fmt "%s not in scope in reduction" x)))
   | App (Abs (x, _t, u), v) -> Some (subst x v u)
-  | App (t, u) -> (
-      match reduce ctx t with
-      | Some t' -> Some (App (t', u))
-      | None -> (
-          match reduce ctx u with Some u' -> Some (App (t, u')) | None -> None))
-  | Abs (x, t, u) -> (
-      match reduce ctx t with
-      | Some t' -> Some (Abs (x, t', u))
-      | None -> (
-          let ctx' = (x, (t, None)) :: ctx in
-          match reduce ctx' u with
-          | Some u' -> Some (Abs (x, t, u'))
-          | None -> None))
+  | App (t, u) ->
+      let* () = reduce ctx t >> fun t' -> App (t', u) in
+      reduce ctx u >> fun u' -> App (t, u')
+  | Abs (x, t, u) ->
+      let* () = reduce ctx t >> fun t' -> Abs (x, t', u) in
+      let ctx' = (x, (t, None)) :: ctx in
+      reduce ctx' u >> fun u' -> Abs (x, t, u')
   (* dependent function type *)
-  | Pi (x, t, u) -> (
-      match reduce ctx t with
-      | Some t' -> Some (Pi (x, t', u))
-      | None -> (
-          let ctx' = (x, (t, None)) :: ctx in
-          match reduce ctx' u with
-          | Some u' -> Some (Pi (x, t, u'))
-          | None -> None))
+  | Pi (x, t, u) ->
+      let* () = reduce ctx t >> fun t' -> Pi (x, t', u) in
+      let ctx' = (x, (t, None)) :: ctx in
+      reduce ctx' u >> fun u' -> Pi (x, t, u')
   | Nat -> None
   | Z -> None
-  | S n -> ( match reduce ctx n with Some n' -> Some (S n') | None -> None)
+  | S n -> reduce ctx n >> fun n' -> S n'
   | Ind (_p, z, _s, Z) -> Some z
   | Ind (p, z, s, S n) ->
       let ih = Ind (p, z, s, n) in
       Some (App (App (s, n), ih))
-  | Ind (p, z, s, n) -> (
-      match reduce ctx n with
-      | Some n' -> Some (Ind (p, z, s, n'))
-      | None -> None)
-  | Eq (t, u) -> (
-      match reduce ctx t with
-      | Some t' -> Some (Eq (t', u))
-      | None -> (
-          match reduce ctx u with Some u' -> Some (Eq (t, u')) | None -> None))
-  | Refl e -> (
-      match reduce ctx e with Some e' -> Some (Refl e') | None -> None)
-  | J (p, p_refl, s, t, eq) -> (
-      match reduce ctx p with
-      | Some p' -> Some (J (p', p_refl, s, t, eq))
-      | None -> (
-          match reduce ctx p_refl with
-          | Some p_refl' -> Some (J (p, p_refl', s, t, eq))
-          | None -> (
-              match reduce ctx s with
-              | Some s' -> Some (J (p, p_refl, s', t, eq))
-              | None -> (
-                  match reduce ctx t with
-                  | Some t' -> Some (J (p, p_refl, s, t', eq))
-                  | None -> (
-                      match reduce ctx eq with
-                      | Some eq' -> Some (J (p, p_refl, s, t, eq'))
-                      | None ->
-                          if alpha s t && alpha eq (Refl s) then
-                            Some (App (p_refl, s))
-                          else None)))))
+  | Ind (p, z, s, n) ->
+      let* () = reduce ctx p >> fun p' -> Ind (p', z, s, n) in
+      let* () = reduce ctx z >> fun z' -> Ind (p, z', s, n) in
+      let* () = reduce ctx s >> fun s' -> Ind (p, z, s', n) in
+      reduce ctx n >> fun n' -> Ind (p, z, s, n')
+  | Eq (t, u) ->
+      let* () = reduce ctx t >> fun t' -> Eq (t', u) in
+      reduce ctx u >> fun u' -> Eq (t, u')
+  | Refl e -> reduce ctx e >> fun e' -> Refl e'
+  | J (p, p_refl, s, t, eq) ->
+      let* () = reduce ctx p >> fun p' -> J (p', p_refl, s, t, eq) in
+      let* () = reduce ctx p_refl >> fun p_refl' -> J (p, p_refl', s, t, eq) in
+      let* () = reduce ctx s >> fun s' -> J (p, p_refl, s', t, eq) in
+      let* () = reduce ctx t >> fun t' -> J (p, p_refl, s, t', eq) in
+      let* () = reduce ctx eq >> fun eq' -> J (p, p_refl, s, t, eq') in
+      (* J rule: J p r x x (Refl x) => r x *)
+      if alpha s t && alpha eq (Refl s) then Some (App (p_refl, s)) else None
 
 (** Normalizing a term by repeatedly reducing it
  NOTE: this function may not terminate *)
@@ -263,7 +243,7 @@ let rec infer (ctx : context) : expr -> expr = function
       Eq (e, e)
   | J (p, r, x, y, eq) ->
       let j_type x y eq = App (App (App (p, x), y), eq) in
-      (* x and y are of the same type *)
+      (* x and y are of the same type A *)
       let a = infer ctx x in
       check ctx y a;
       (* p: (x y : A) -> x = y -> Type
@@ -288,8 +268,20 @@ and check_typable (ctx : context) (tm : expr) : unit =
   let _ = infer ctx tm in
   ()
 
+let%test_unit "reduce_0" =
+  let ctx = [ ("Bool", (Type, None)) ] in
+  let u =
+    Pi
+      ( "Bool",
+        Type,
+        Pi ("n", Nat, Pi ("x", App (Abs ("n", Nat, Nat), Var "n"), Var "Bool"))
+      )
+  in
+  let u' = Pi ("Bool", Type, Pi ("n", Nat, Pi ("x", Nat, Var "Bool"))) in
+  assert (normalize ctx u = u')
+
 let%test_unit "conversion-1" =
-  let ctx = ("Bool", (Type, None)) :: [] in
+  let ctx = [ ("Bool", (Type, None)) ] in
   let u =
     of_string "Pi (n : Nat) -> Pi (x : (fun (n : Nat) -> Nat) n) -> Bool"
   in
@@ -381,3 +373,73 @@ let%test_unit "infer depdent function" =
   let a1 = add (Var "n") (add Z (S Z)) in
   let ty_g = Pi ("rr", App (Var "F", Var "n"), Eq (a0, a1)) in
   check ctx g ty_g
+
+let%test_unit "normalize" =
+  let ctx =
+    [
+      ("suc", (Pi ("_", Nat, Nat), Some (Abs ("k", Nat, S (Var "k")))));
+      ("x", (Nat, None));
+    ]
+  in
+  let tm =
+    Pi
+      ( "y",
+        Nat,
+        Pi
+          ( "IH",
+            Eq
+              ( Ind
+                  ( Abs ("n", Nat, Nat),
+                    Var "y",
+                    Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                    Var "x" ),
+                Ind
+                  ( Abs ("n", Nat, Nat),
+                    Var "x",
+                    Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                    Var "y" ) ),
+            Eq
+              ( Ind
+                  ( Abs ("n", Nat, Nat),
+                    S (Var "y"),
+                    Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                    Var "x" ),
+                S
+                  (Ind
+                     ( Abs ("n", Nat, Nat),
+                       Var "x",
+                       Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                       Var "y" )) ) ) )
+  in
+  let tm' =
+    Pi
+      ( "y",
+        Nat,
+        Pi
+          ( "IH",
+            Eq
+              ( Ind
+                  ( Abs ("n", Nat, Nat),
+                    Var "y",
+                    Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                    Var "x" ),
+                Ind
+                  ( Abs ("n", Nat, Nat),
+                    Var "x",
+                    Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                    Var "y" ) ),
+            Eq
+              ( Ind
+                  ( Abs ("n", Nat, Nat),
+                    App (Var "suc", Var "y"),
+                    Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                    Var "x" ),
+                S
+                  (Ind
+                     ( Abs ("n", Nat, Nat),
+                       Var "x",
+                       Abs ("m", Nat, Abs ("s", Nat, S (Var "s"))),
+                       Var "y" )) ) ) )
+  in
+  assert (normalize ctx tm' <> tm');
+  check_conv ctx tm tm'
