@@ -1,50 +1,138 @@
-define fst = fun (m : Nat) -> fun (n : Nat) -> m
-define pred = fun (k : Nat) -> Ind (fun (n : Nat) -> Nat) Z fst k
-eval pred Z
-eval pred (S (S (S Z)))
+define fst = fun (m : Nat) -> fun (n : Nat) -> m ;;
+define suc = fun (k : Nat) -> S k ;;
+
+define pred = fun (k : Nat) -> Ind (fun (n : Nat) -> Nat) Z fst k ;;
+eval pred Z ;;
+eval pred (S (S (S Z))) ;;
+eval pred (suc (suc (suc Z))) ;;
+
+check (fun (n : Nat) -> S (pred n)) = Nat => Nat;;
 
 
-define add = fun (m : Nat) -> fun (n : Nat) \
-          -> Ind \
-             (fun (n : Nat) -> Nat) \
-             n \
-             (fun (m : Nat) -> fun (s : Nat) -> S s) \
-             m
-eval add (S (S (S Z))) (S (S Z))
+define add = fun (m : Nat) -> fun (n : Nat) ->
+             Ind
+               (fun (n : Nat) -> Nat)
+               n
+               (fun (m : Nat) -> fun (s : Nat) -> S s)
+               m   ;;
+eval add (S (S (S Z))) (S (S Z)) ;;
 
-define mul = fun (m : Nat) -> fun (n : Nat) \
-          -> Ind \
-             (fun (n : Nat) -> Nat) \
-             Z \
-             (fun (m : Nat) -> fun (s : Nat) -> add n s) \
-             m
-eval mul Z (S (S (S Z)))
-eval mul (S (S (S Z))) Z
-eval mul (S (S (S Z))) (S (S Z))
-
-
-define SeqPred = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> S x = S y
-define sxEQsx = fun (x : Nat) -> Refl (S x)
-define Seq = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> J SeqPred sxEQsx x y eq
-check Seq = Pi (x : Nat) -> Pi (y : Nat) -> Pi (e : x = y) -> S x = S y
+define mul = fun (m : Nat) -> fun (n : Nat) ->
+             Ind
+               (fun (n : Nat) -> Nat)
+               Z
+               (fun (m : Nat) -> fun (s : Nat) -> add n s)
+               m
+             ;;
+eval mul Z (S (S (S Z))) ;;
+eval mul (S (S (S Z))) Z ;;
+eval mul (S (S (S Z))) (S (S Z)) ;;
 
 
-define zadd = fun (n : Nat) -> Refl n
-check zadd = Pi (n : Nat) -> add Z n = n
+define SeqPred = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> S x = S y ;;
+define sxEQsx = fun (x : Nat) -> Refl (S x) ;;
+define Seq = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> J SeqPred sxEQsx x y eq ;;
+check Seq = Pi (x : Nat) -> Pi (y : Nat) -> Pi (e : x = y) -> S x = S y ;;
 
-define congType = Pi (T : Type) -> Pi (U : Type) -> Pi (f : T => U) \
-               -> Pi (x : T) -> Pi (y : T) -> x = y => f x = f y
-define cong = fun (T : Type) -> fun (U : Type) -> fun (f : T => U) \
-           -> fun (x : T) -> fun (y : T) -> fun (eq : x = y) \
-           -> J \
-                 (fun (x : T) -> fun (y : T) -> fun (eq : x = y) -> f x = f y) \
-                 (fun (x : T) -> Refl (f x)) \
-                 x \
-                 y \
-                 eq
-check cong = congType
+define congType = Pi (T : Type) -> Pi (U : Type) -> Pi (f : T => U) ->
+                  Pi (x : T) -> Pi (y : T) -> x = y => f x = f y;;
+define cong = fun (T : Type) -> fun (U : Type) -> fun (f : T => U)
+           -> fun (x : T) -> fun (y : T) -> fun (eq : x = y)
+           -> J
+                 (fun (x : T) -> fun (y : T) -> fun (eq : x = y) -> f x = f y)
+                 (fun (x : T) -> Refl (f x))
+                 x
+                 y
+                 eq;;
+check cong = congType;;
+define congSuc = cong Nat Nat suc;;
+check congSuc = Pi (m : Nat) -> Pi (n : Nat) -> Pi (e : m = n) -> S m = S n;;
 
-exit
+define transType = Pi (T : Type) ->
+                     Pi (x : T) -> Pi (y : T) -> Pi (z : T) ->
+                       Pi (xy : x = y) -> Pi (yz : y = z) ->
+                         x = z;;
+define trans = fun (T : Type) ->
+                 fun (x : T) -> fun (y : T) -> fun (z : T) ->
+                   fun (xy : x = y) -> fun (yz : y = z) ->
+                     (J
+                       (fun (s : T) -> fun (t : T) -> fun (e : s = t) -> t = z -> s = z)
+                       (fun (t : T) -> fun (e : t = z) -> e)
+                       x y xy) yz;;
+check trans = transType;;
+
+# 0 is left/right netural element of addition
+define zadd = fun (n : Nat) -> Refl n;;
+check zadd =  Pi (n : Nat) -> (add Z n = n);;
+define addz = fun (n : Nat) ->
+                Ind
+                  (fun (n : Nat) -> add n Z = n)
+                  (Refl Z)
+                  (fun (n : Nat) -> fun (ih : add n Z = n) ->
+                    congSuc (add n Z) n ih)
+                  n;;
+check addz =  Pi (n : Nat) -> (add n Z = n);;
 
 # add-assoc, add-comm
+define addAssocType = Pi (x : Nat) -> Pi (y : Nat) -> Pi (z : Nat) ->
+                      add (add x y) z = add x (add y z);;
+define addAssocPred = fun (x : Nat) -> Pi (y : Nat) -> Pi (z : Nat) ->
+                      add (add x y) z = add x (add y z);;
+check addAssocPred = Nat => Type;;
+
+
+define addAssocBase = (fun (y : Nat) -> fun (z : Nat) -> Refl (add y z)) ;;
+check addAssocBase = Pi (y : Nat) -> Pi (z : Nat) -> add (add Z y) z = add Z (add y z);;
+check addAssocBase = addAssocPred Z ;;
+
+define addAssocStep = fun (x : Nat) -> 
+                      fun (IH : addAssocPred x) ->
+                      fun (y : Nat) -> fun (z : Nat) ->
+                        congSuc
+                             (add (add x y) z)
+                             (add x (add y z))
+                             # get the proof of (x + y) + z = x + (y + z)
+                             (IH y z) ;;
+check addAssocStep = Pi (x : Nat) -> Pi (IH : addAssocPred x) -> addAssocPred (S x);;
+
+define addAssoc = fun (x : Nat) -> Ind addAssocPred addAssocBase addAssocStep x ;;
+type addAssoc ;;
+check addAssoc = addAssocType ;;
+
+
+define addSucThm = fun (m : Nat) ->
+                     fun (n : Nat) ->
+                       Ind
+                         (fun (t : Nat) -> add t (suc n) = suc (add t n))
+                         (Refl (suc n))
+                         (fun (t : Nat) -> fun (IH : add t (suc n) = suc (add t n)) ->
+                            congSuc (add t (suc n)) (suc (add t n)) IH
+                         )
+                         m;;
+check addSucThm = Pi (m : Nat) -> Pi (n : Nat) -> add m (suc n) = suc (add m n);;
+
+define addCommTerm = fun (x : Nat) -> fun (y : Nat) -> add x y = add y x;;
+check addCommTerm = Nat => Nat => Type;;
+define addCommType = Pi (x : Nat) -> Pi (y : Nat) -> addCommTerm x y;;
+check addCommType = Type;;
+
+define addComm = fun (x : Nat) -> fun (y : Nat) ->
+                   Ind
+                     (fun (y : Nat) -> addCommTerm x y)
+                     (addz x)
+                     (fun (y : Nat) -> fun (IH : addCommTerm x y) ->
+                       trans Nat
+                        # x y z
+                        (add x (suc y))
+                        (suc (add x y))
+                        (suc (add y x))
+                        # x=y y=z
+                        (addSucThm x y)
+                        (congSuc (add x y) (add y x) IH)
+                     )
+                     y ;;
+# check addComm = addCommTypeAssocType ;;
+exit;;
+
 # mul-assoc, mul-comm
+exit;;
