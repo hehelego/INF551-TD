@@ -7,15 +7,39 @@ About the course
 
 Progress
 
-- TD1: All required tasks done.  
-    **TODO** 5.3 implement functionss in the tiny programming language.
+- TD1: One optional task left: _5.3 implement functions for the tiny programming language_.
 - TD2: Complete
 - TD3: Complete
-- TD4: (Work in progress) working on the dependent type prover
+- TD4: 4 optional tasks to be finished.
 - TD5: Complete
 - TD6: Complete
 - TD7: Complete
 - TD8: Complete
+
+Further extensions beyond the optional tasks:
+
+For the SAT solver
+
+- Conflict driver clause learning (CDCL)
+- Basic SMT solving
+
+For the simple typed programming language
+
+- build a virtual machine
+- compile to byte code and run on the virtual machine
+
+For the proof assistant
+
+- bidirectional type checking
+- implicit parameters
+- module system
+- proof searching
+
+For the agda formalization of programming languages
+
+- confluence of the non-deterministic beta reduction
+- strong normalization of STLC
+- normalization by evaluation (NbE)
 
 ## TD1 a simple typed programming language
 
@@ -28,7 +52,7 @@ Implement the typing rules and the reduction rules.
   - if branchings
   - pairs and projections
   - unit values
-  - functions **WIP**
+  - functions **TODO**
 - type inference and type checking
 - single step reduction, parallel reduction, and normalization
 
@@ -62,7 +86,11 @@ Implement a DPLL SAT solver in OCaml.
   - W-types for defining inductive type **WIP**
   - layered type universes **WIP**
 - another proof assistance based on dependent type theory
+- proving associativity and commutativity of natural number addition
+- proving associativity and commutativity of natural number multiplication
 - exploring paradoxes in the proof assistance **WIP**
+- de Bruijn indices representation **TODO**
+- normalization by evaluation (NbE) **TODO**
 
 ## TD5 propositional logic in Agda
 
@@ -80,7 +108,7 @@ Implement a DPLL SAT solver in OCaml.
 - proving the formula of the sum of 1st power of natural numbers
 - formalizing the Euclidean division algorithm with intrinsic/extrinsic approaches
 
-## TD7
+## TD7 sorting algorithms in Agda
 
 - formalizing the insertion sort algorithm
 - proving the correctness of insertion sort
@@ -89,7 +117,7 @@ Implement a DPLL SAT solver in OCaml.
 - proving the termination of non-structural inductions with well-founded induction
 - defining the merge sort algorithm using well-founded induction
 
-## TD8
+## TD8 formalizing a simple programming language in Agda
 
 - encoding Plotkin's Programming Computable Functions (PCF) in Agda
 - typing context insertion and free variable lifting
