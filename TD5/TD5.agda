@@ -128,6 +128,39 @@ converse'-dm∨ {A} {B} f g = g (left λ { x → g (right λ { y → f (x , y) }
 nnlem : {A : Set} → ¬ (¬ (A ∨ (¬ A)))
 nnlem {A} f = f (right λ { x → f (left x) })
 
+-- f : (A or ~A) -> false
+-- ----------------------
+-- false
+-- [apply f]
+--
+-- f : (A or ~A) -> false
+-- ----------------------
+-- A or ~A
+-- [right]
+--
+-- f : (A or ~A) -> false
+-- ----------------------
+-- A -> false
+-- [intro x]
+--
+-- f : (A or ~A) -> false
+-- x : A
+-- ----------------------
+-- false
+-- [apply f]
+--
+-- f : (A or ~A) -> false
+-- x : A
+-- ----------------------
+-- A or ~A
+-- [left]
+-- 
+-- f : (A or ~A) -> false
+-- x : A
+-- ----------------------
+-- A
+-- [exact x]
+
 rp : {A : Set} → (A → ¬ A) → ((¬ A) → A) → ⊥
 rp {A} f g = f x x
   where
