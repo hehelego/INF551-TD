@@ -19,27 +19,40 @@ let fresh_var : unit -> string =
 
 (** [free_var x t] test whether [x] occurs freely in [t] *)
 let rec free_var (x : var) : expr -> bool = function
+  (* type universe *)
   | Type -> false
+  (* function *)
   | Var y -> x = y
   | App (u, v) -> free_var x u || free_var x v
   (* Consider the following corner case
      Pi(x : A) . ( Pi(x : F(x)) . B(x) ) *)
-  | Abs (y, t, u) -> free_var x t || (x <> y && free_var x u)
-  | Pi (y, t, u) -> free_var x t || (x <> y && free_var x u)
-  | Nat -> false
-  | Z -> false
+  | Abs (y, t, u) | Pi (y, t, u) -> free_var x t || (x <> y && free_var x u)
+  (* natural number *)
+  | Nat | Z -> false
   | S n -> free_var x n
   | Ind (p, z, s, n) ->
       free_var x p || free_var x z || free_var x s || free_var x n
+  (* equality *)
   | Eq (t, u) -> free_var x t || free_var x u
   | Refl e -> free_var x e
   | J (p, p_refl, s, t, s_eq_t) ->
       free_var x p || free_var x p_refl || free_var x s || free_var x t
       || free_var x s_eq_t
+  (* conjunction *)
+  | Conj (t, u) | Pair (t, u) -> free_var x t || free_var x u
+  | Proj0 t | Proj1 t -> free_var x t
+  (* disjunction *)
+  | Disj (t, u) | Inj0 (t, u) | Inj1 (t, u) -> free_var x t || free_var x u
+  | Case (t, l, r) -> free_var x t || free_var x l || free_var x r
+  (* true/false and negation *)
+  | True | False | Unit -> false
+  | Absurd (t, a) -> free_var x t || free_var x a
 
 (** [subst x t u] replaces all free occurence of [x] in [u] with [t] *)
 let rec subst (x : var) (tm : expr) : expr -> expr = function
+  (* type universe *)
   | Type -> Type
+  (* function *)
   | Var y -> if x = y then tm else Var y
   | App (u, v) ->
       let u' = subst x tm u in
@@ -71,7 +84,7 @@ let rec subst (x : var) (tm : expr) : expr -> expr = function
       let s' = subst x tm s in
       let n' = subst x tm n in
       Ind (p', z', s', n')
-  (* (* equality types *) *)
+  (* equality types *)
   | Eq (t, u) ->
       let t' = subst x tm t in
       let u' = subst x tm u in
@@ -84,34 +97,83 @@ let rec subst (x : var) (tm : expr) : expr -> expr = function
       let t' = subst x tm t in
       let eq' = subst x tm eq in
       J (p', p_refl', s', t', eq')
+  (* conjunction *)
+  | Conj (u, v) ->
+      let u' = subst x tm u in
+      let v' = subst x tm v in
+      Conj (u', v')
+  | Pair (u, v) ->
+      let u' = subst x tm u in
+      let v' = subst x tm v in
+      Pair (u', v')
+  | Proj0 t -> Proj0 (subst x tm t)
+  | Proj1 t -> Proj1 (subst x tm t)
+  (* disjunction *)
+  | Disj (u, v) ->
+      let u' = subst x tm u in
+      let v' = subst x tm v in
+      Disj (u', v')
+  | Inj0 (u, v) ->
+      let u' = subst x tm u in
+      let v' = subst x tm v in
+      Inj0 (u', v')
+  | Inj1 (u, v) ->
+      let u' = subst x tm u in
+      let v' = subst x tm v in
+      Inj1 (u', v')
+  | Case (t, l, r) ->
+      let t' = subst x tm t in
+      let l' = subst x tm l in
+      let r' = subst x tm r in
+      Case (t', l', r')
+  (* true/false and negation *)
+  | True -> True
+  | False -> False
+  | Unit -> Unit
+  | Absurd (t, a) ->
+      let t' = subst x tm t in
+      let a' = subst x tm a in
+      Absurd (t', a')
 
 (** test if two terms are equivalent up-to alpha-renaming *)
 let%track_show rec alpha (tm : expr) (tm' : expr) : bool =
   match (tm, tm') with
+  (* type universe *)
   | Type, Type -> true
+  (* function *)
   | Var x, Var y -> x = y
   | App (t, u), App (t', u') -> alpha t t' && alpha u u'
-  | Abs (x, t, u), Abs (y, t', u') ->
+  | Abs (x, t, u), Abs (y, t', u') | Pi (x, t, u), Pi (y, t', u') ->
       alpha t t'
       &&
       let z = Var (fresh_var ()) in
       let v, v' = (subst x z u, subst y z u') in
       alpha v v'
-  | Pi (x, t, u), Pi (y, t', u') ->
-      alpha t t'
-      &&
-      let z = Var (fresh_var ()) in
-      let v, v' = (subst x z u, subst y z u') in
-      alpha v v'
+      (* natural number *)
   | Nat, Nat -> true
   | Z, Z -> true
   | S n, S n' -> alpha n n'
   | Ind (p, z, s, n), Ind (p', z', s', n') ->
-      alpha p p' && alpha z z' && alpha s s' && alpha n n'
+      alpha p p' && alpha z z' && alpha s s' && alpha n n' (* equality *)
   | Eq (t, u), Eq (t', u') -> alpha t t' && alpha u u'
   | Refl e, Refl e' -> alpha e e'
   | J (p, r, x, y, eq), J (p', r', x', y', eq') ->
       alpha p p' && alpha r r' && alpha x x' && alpha y y' && alpha eq eq'
+  (* conjunction *)
+  | Conj (u, v), Conj (u', v') | Pair (u, v), Pair (u', v') ->
+      alpha u u' && alpha v v'
+  | Proj0 t, Proj0 t' | Proj1 t, Proj1 t' -> alpha t t'
+  (* disjunction *)
+  | Disj (u, v), Disj (u', v')
+  | Inj0 (u, v), Inj0 (u', v')
+  | Inj1 (u, v), Inj1 (u', v') ->
+      alpha u u' && alpha v v'
+  | Case (t, l, r), Case (t', l', r') -> alpha t t' && alpha l l' && alpha r r'
+  (* true/false and negation *)
+  | True, True -> true
+  | False, False -> true
+  | Unit, Unit -> true
+  | Absurd (t, a), Absurd (t', a') -> alpha t t' && alpha a a'
   | _ -> false
 
 (** Reducing a term one step further if it is possible.
@@ -121,7 +183,9 @@ let rec reduce (ctx : context) (e : expr) : expr option =
   let ( >> ) opt f = Option.map f opt in
   let ( let* ) opt f = match opt with Some x -> Some x | None -> f () in
   match e with
+  (* type universe *)
   | Type -> None
+  (* function *)
   | Var x -> (
       match List.assoc_opt x ctx with
       | Some (_ty, value) -> value
@@ -139,6 +203,7 @@ let rec reduce (ctx : context) (e : expr) : expr option =
       let* () = reduce ctx t >> fun t' -> Pi (x, t', u) in
       let ctx' = (x, (t, None)) :: ctx in
       reduce ctx' u >> fun u' -> Pi (x, t, u')
+      (* natural number *)
   | Nat -> None
   | Z -> None
   | S n -> reduce ctx n >> fun n' -> S n'
@@ -151,6 +216,7 @@ let rec reduce (ctx : context) (e : expr) : expr option =
       let* () = reduce ctx z >> fun z' -> Ind (p, z', s, n) in
       let* () = reduce ctx s >> fun s' -> Ind (p, z, s', n) in
       reduce ctx n >> fun n' -> Ind (p, z, s, n')
+      (* equality *)
   | Eq (t, u) ->
       let* () = reduce ctx t >> fun t' -> Eq (t', u) in
       reduce ctx u >> fun u' -> Eq (t, u')
@@ -163,6 +229,38 @@ let rec reduce (ctx : context) (e : expr) : expr option =
       let* () = reduce ctx eq >> fun eq' -> J (p, p_refl, s, t, eq') in
       (* J rule: J p r x x (Refl x) => r x *)
       if alpha s t && alpha eq (Refl s) then Some (App (p_refl, s)) else None
+  (* conjunction *)
+  | Conj (u, v) ->
+      let* () = reduce ctx u >> fun u' -> Conj (u', v) in
+      reduce ctx v >> fun v' -> Conj (u, v')
+  | Pair (u, v) ->
+      let* () = reduce ctx u >> fun u' -> Pair (u', v) in
+      reduce ctx v >> fun v' -> Pair (u, v')
+  | Proj0 (Pair (u, _v)) -> Some u
+  | Proj0 t -> reduce ctx t >> fun t' -> Proj0 t'
+  | Proj1 (Pair (_u, v)) -> Some v
+  | Proj1 t -> reduce ctx t >> fun t' -> Proj1 t'
+  (* disjunction *)
+  | Disj (u, v) ->
+      let* () = reduce ctx u >> fun u' -> Disj (u', v) in
+      reduce ctx v >> fun v' -> Disj (u, v')
+  | Inj0 (u, v) ->
+      let* () = reduce ctx u >> fun u' -> Inj0 (u', v) in
+      reduce ctx v >> fun v' -> Inj0 (u, v')
+  | Inj1 (u, v) ->
+      let* () = reduce ctx u >> fun u' -> Inj1 (u', v) in
+      reduce ctx v >> fun v' -> Inj1 (u, v')
+  | Case (Inj0 (x, _tyR), l, _r) -> Some (App (l, x))
+  | Case (Inj1 (_tyL, y), _l, r) -> Some (App (r, y))
+  | Case (t, l, r) ->
+      let* () = reduce ctx t >> fun t' -> Case (t', l, r) in
+      let* () = reduce ctx l >> fun l' -> Case (t, l', r) in
+      reduce ctx r >> fun r' -> Case (t, l, r')
+  (* true/false and negation *)
+  | True | False | Unit -> None
+  | Absurd (bot, ty) ->
+      let* () = reduce ctx bot >> fun bot' -> Absurd (bot', ty) in
+      reduce ctx ty >> fun ty' -> Absurd (bot, ty')
 
 (** Normalizing a term by repeatedly reducing it
  NOTE: this function may not terminate *)
@@ -182,7 +280,9 @@ let check_conv (ctx : context) (t : expr) (t' : expr) : unit =
     raise (Type_error (fmt "%s =/= %s in the given context" st st'))
 
 let rec infer (ctx : context) : expr -> expr = function
+  (* type universe *)
   | Type -> Type
+  (* function *)
   | Var v -> (
       match List.assoc_opt v ctx with
       | Some (ty, _) -> ty
@@ -194,7 +294,8 @@ let rec infer (ctx : context) : expr -> expr = function
           subst x u ret
       | ty ->
           raise
-            (Type_error (fmt "expecting a function, found %s" (to_string ty))))
+            (Type_error (fmt "App expects a function, found %s" (to_string ty)))
+      )
   | Abs (x, arg, ret) ->
       check ctx arg Type;
       let ctx' = (x, (arg, None)) :: ctx in
@@ -205,6 +306,7 @@ let rec infer (ctx : context) : expr -> expr = function
       let ctx' = (x, (arg, None)) :: ctx in
       check ctx' ret Type;
       Type
+      (* natural number *)
   | Nat -> Type
   | Z -> Nat
   | S n ->
@@ -230,9 +332,8 @@ let rec infer (ctx : context) : expr -> expr = function
           check ctx s ty_s_expect;
 
           App (p, n)
-      | ty ->
-          let msg = fmt "Ind expects a Nat -> Type. Actual %s" (to_string ty) in
-          raise (Type_error msg))
+      | ty -> raise (Type_error (fmt "Ind 1st argument %s" (to_string ty))))
+  (* equality *)
   | Eq (t, u) ->
       let tt = infer ctx t in
       let tu = infer ctx u in
@@ -257,7 +358,63 @@ let rec infer (ctx : context) : expr -> expr = function
       check ctx r (Pi (s, a, j_type vs vs (Refl vs)));
       check ctx eq (Eq (x, y));
       j_type x y eq
+  (* conjunction *)
+  | Conj (u, v) ->
+      check ctx u Type;
+      check ctx v Type;
+      Type
+  | Pair (u, v) ->
+      let a = infer ctx u in
+      let b = infer ctx v in
+      Conj (a, b)
+  | Proj0 t -> (
+      match infer ctx t |> normalize ctx with
+      | Conj (u, _v) -> u
+      | ty ->
+          raise
+            (Type_error
+               (fmt "Proj0 expects a Conjunction, found %s" (to_string ty))))
+  | Proj1 t -> (
+      match infer ctx t |> normalize ctx with
+      | Conj (_u, v) -> v
+      | ty ->
+          raise
+            (Type_error
+               (fmt "Proj1 expects a Conjunction, found %s" (to_string ty))))
+  (* disjunction *)
+  | Disj (u, v) ->
+      check ctx u Type;
+      check ctx v Type;
+      Type
+  | Inj0 (x, tyR) ->
+      check ctx tyR Type;
+      let l = infer ctx x in
+      Disj (l, tyR)
+  | Inj1 (tyL, y) ->
+      check ctx tyL Type;
+      let r = infer ctx y in
+      Disj (tyL, r)
+  | Case (t, l, r) -> (
+      let ty = infer ctx t |> normalize ctx in
+      let tyL = infer ctx l |> normalize ctx in
+      let tyR = infer ctx r |> normalize ctx in
+      match (ty, tyL, tyR) with
+      | Disj (a, b), Pi (_x, a', c), Pi (_y, b', c') ->
+          check_conv ctx a a';
+          check_conv ctx b b';
+          check_conv ctx c c';
+          c
+      | _ ->
+          let ty, tyL, tyR = (to_string ty, to_string tyL, to_string tyR) in
+          raise (Type_error (fmt "Case type %s %s %s" ty tyL tyR)))
+  (* true/false and negation *)
+  | True | False -> Type
+  | Unit -> True
+  | Absurd (bot, ty) ->
+      check ctx bot False;
+      ty
 
+(** [check ctx tm ty] validate that under context [ctx] term [tm] has type [ty] *)
 and check (ctx : context) (tm : expr) (ty : expr) : unit =
   let ty_ty = infer ctx ty in
   check_conv ctx ty_ty Type;
@@ -286,36 +443,26 @@ let%test_unit "conversion-1" =
     of_string "Pi (n : Nat) -> Pi (x : (fun (n : Nat) -> Nat) n) -> Bool"
   in
   let t = of_string "Pi (m : Nat) -> Pi (m : Nat) -> Bool" in
-  print_string "TYPE 1:  ";
-  print_endline (normalize ctx u |> to_string);
-  print_string "TYPE 2:  ";
-  print_endline (normalize ctx t |> to_string);
   check_conv ctx u t
 
 let%test_unit "conversion-2" =
-  let ctx = [] in
   let u =
-    of_string
-      "Pi (n : Nat) -> Pi (x : (fun (n : Nat) -> Nat) n) -> ((fun (n : Nat)-> \
-       Nat) (S n))"
+    [
+      "Pi (n : Nat) ->";
+      "Pi (x : (fun (n : Nat) -> Nat) n) ->";
+      "(fun (n : Nat) -> Nat) (S n)";
+    ]
+    |> String.concat " " |> of_string
   in
   let t = of_string "Pi (m : Nat) -> Pi (m : Nat) -> Nat" in
-  print_string "TYPE 1:  ";
-  print_endline (normalize ctx u |> to_string);
-  print_string "TYPE 2:  ";
-  print_endline (normalize ctx t |> to_string);
-  check_conv ctx u t
+  check_conv [] u t
 
 let%test_unit "conversion-3" =
-  let ctx = ("Bool", (Type, None)) :: [] in
+  let ctx = [ ("Bool", (Type, None)) ] in
   let u =
     of_string "Pi (n : Nat) -> Pi (n : (fun (n : Nat) -> Nat) n) -> Bool"
   in
   let t = of_string "Pi (m : Nat) -> Pi (m : Nat) -> Bool" in
-  print_string "TYPE 1:  ";
-  print_endline (normalize ctx u |> to_string);
-  print_string "TYPE 2:  ";
-  print_endline (normalize ctx t |> to_string);
   check_conv ctx u t
 
 let%test_unit "infer-0" =
@@ -324,23 +471,34 @@ let%test_unit "infer-0" =
   check [] f t
 
 let%test_unit "infer-1" =
+  let f =
+    [
+      "fun (x : Nat) ->";
+      "Pi (y : Nat) ->";
+      "Pi (z : Nat) ->";
+      "add (add x y) z = add x (add y z)";
+    ]
+    |> String.concat " " |> of_string
+  in
+  let g = of_string "fun (x : Nat) -> fun (IH : F x) -> IH Z" in
+  let ty_g =
+    [
+      "Pi (x : Nat) ->";
+      "Pi (IH : (F x)) ->";
+      "Pi (z : Nat) ->";
+      "add (add x Z) z = add x (add Z z)";
+    ]
+    |> String.concat " " |> of_string
+  in
   let ctx =
-    [ ("add", (Pi ("x", Nat, Pi ("y", Nat, Nat)), None)); ("x", (Nat, None)) ]
+    [
+      ("add", (Pi ("x", Nat, Pi ("y", Nat, Nat)), None));
+      ("x", (Nat, None));
+      ("F", (impl Nat Type, Some f));
+    ]
   in
-  let raw_text =
-    "fun (x : Nat) -> Pi (y : Nat) -> Pi (z : Nat) -> add (add x y) z = add x \
-     (add y z)"
-  in
-  let f = of_string raw_text in
-  check ctx f (of_string "Nat => Type");
-
-  let ctx = ("F", (Pi ("_", Nat, Type), Some f)) :: ctx in
-
-  let raw_text = "fun (x : Nat) -> fun (IH : F x) -> IH Z" in
-  let g = of_string raw_text in
-  let t = infer ctx g in
-  print_endline ("type of g is " ^ to_string t);
-  ()
+  check ctx f (impl Nat Type);
+  check ctx g ty_g
 
 let%test_unit "infer depdent function" =
   let ctx =
@@ -443,3 +601,36 @@ let%test_unit "normalize" =
   in
   assert (normalize ctx tm' <> tm');
   check_conv ctx tm tm'
+
+let%test_unit "check-conj" =
+  let x, x' = ("x", Var "x") in
+  let ctx = [ (x, (Nat, None)) ] in
+  let t = Pair (Nat, Pair (x', Refl x')) in
+  check ctx t (Conj (Type, Conj (Nat, Eq (x', x'))));
+  check ctx (Conj (Type, Nat)) Type;
+  check ctx (Proj0 t) Type;
+  check ctx (Proj0 (Proj1 t)) Nat
+
+let%test_unit "reduce-conj" =
+  let pair = Pair (Z, S Z) in
+  check_conv [] (Proj0 pair) Z;
+  check_conv [] (Proj1 pair) (S Z);
+  ()
+
+let%test_unit "check-disj" =
+  let f, g, t = (Var "f", Var "g", Var "T") in
+  let ctx =
+    [
+      ("T", (Type, None));
+      ("f", (Pi ("_", Nat, Var "T"), None));
+      ("g", (Pi ("_", True, Var "T"), None));
+    ]
+  in
+  let t0 = Inj0 (Z, True) in
+  let t1 = Inj1 (Nat, Unit) in
+  check ctx t0 (Disj (Nat, True));
+  check ctx t1 (Disj (Nat, True));
+  let u0 = Case (t0, f, g) in
+  let u1 = Case (t0, f, g) in
+  check ctx u0 t;
+  check ctx u1 t

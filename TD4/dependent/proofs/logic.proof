@@ -1,0 +1,229 @@
+# proofs from TD5
+
+# 2. Our first proof
+
+define andComm = fun (A : Type) ->
+                 fun (B : Type) ->
+                 fun (x : A /\ B) ->
+                 Pair (Proj1 x) (Proj0 x);;
+
+
+check andComm = (A : Type) -> (B : Type) -> A /\ B => B /\ A;;
+
+# 3. Implication
+
+define id = fun (A : Type) -> fun (x : A) -> x;;
+check id = (A : Type) -> A => A;;
+
+define K = fun (A : Type) -> fun (B : Type) ->
+           fun (a : A   ) -> fun (b : B   ) ->
+           a;;
+type (A : Type) -> (B : Type) -> A => B => A;;
+check K = (A : Type) -> (B : Type) -> A => B => A;;
+
+define app = fun (A : Type) -> fun (B : Type) -> id (A => B);;
+check app = (A : Type) -> (B : Type) ->
+            (A => B) => A => B;;
+
+define flip = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+              fun (f : A => B => C) ->
+              fun (y : B) -> fun (x : A) ->
+              f x y;;
+check flip = (A : Type) -> (B : Type) -> (C : Type) ->
+             (A => B => C) => B => A => C;;
+
+define comp = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+              fun (f : A => B) ->
+              fun (g : B => C) ->
+              fun (x : A) ->
+              g (f x);;
+check comp = (A : Type) -> (B : Type) -> (C : Type) ->
+             (A => B) => (B => C) => A => C;;
+
+define s = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+           fun (f : A => B => C) ->
+           fun (g : A => B) ->
+           fun (x : A) ->
+           f x (g x);;
+check s = (A : Type) -> (B : Type) -> (C : Type) ->
+          (A => B => C) => (A => B) => (A => C);;
+
+# 4. Implication
+
+define fst = fun (A : Type) -> fun (B : Type) -> fun (x : A /\ B) -> Proj0 x;;
+define snd = fun (A : Type) -> fun (B : Type) -> fun (x : A /\ B) -> Proj1 x;;
+check Pair fst snd = ((A : Type) -> (B : Type) -> A /\ B => A)
+                     /\ ((A : Type) -> (B : Type) -> A /\ B => B);;
+
+define diag = fun (A : Type) -> fun (x : A) -> Pair x x;;
+check diag = (A : Type) -> A => A /\ A;;
+
+define curry = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+               fun (f : A /\ B => C) ->
+               fun (x : A) -> fun (y : B) ->
+               f (Pair x y);;
+check curry = (A : Type) -> (B : Type) -> (C : Type) ->
+              (A /\ B => C) => A => B => C;;
+
+define uncurry = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+                 fun (f : A => B => C) ->
+                 fun (x : A /\ B) ->
+                 f (fst A B x) (snd A B x);;
+check uncurry = (A : Type) -> (B : Type) -> (C : Type) ->
+                (A => B => C) => A /\ B => C;;
+
+define equiv = fun (A : Type) -> fun (B : Type) -> (A => B) /\ (B => A);;
+check equiv = Type => Type => Type;;
+
+define currying = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+                  Pair (curry A B C) (uncurry A B C);;
+check currying = (A : Type) -> (B : Type) -> (C : Type) ->
+                 equiv (A /\ B => C) (A => B => C);;
+
+define ImpAndDistrib = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+                       fun (f : A => B /\ C) ->
+                       Pair (fun (x : A) -> fst B C (f x))
+                            (fun (x : A) -> snd B C (f x));;
+check ImpAndDistrib = (A : Type) -> (B : Type) -> (C : Type) ->
+                      (A => B /\ C) => (A => B) /\ (A => C);;
+
+# 5. Disjunction
+
+define orElim = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+                fun (xy : A \/ B) ->
+                fun (f : A => C) -> fun (g : B => C) ->
+                Case xy f g;;
+check orElim = (A : Type) -> (B : Type) -> (C : Type) ->
+               A \/ B => (A => C) => (B => C) => C;;
+
+define orComm = fun (A : Type) -> fun (B : Type) ->
+                fun (xy : A \/ B) ->
+                Case xy (fun (x : A) -> Inj1 B x)
+                        (fun (y : B) -> Inj0 y A);;
+check orComm = (A : Type) -> (B : Type) -> A \/ B => B \/ A;;
+
+define AndOrDistrib = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
+                      fun (aBC : A /\ (B \/ C)) ->
+                      Case (Proj1 aBC)
+                        (fun (b : B) -> Inj0 (Pair (Proj0 aBC) b) (A /\ C))
+                        (fun (c : C) -> Inj1 (A /\ B) (Pair (Proj0 aBC) c));;
+check AndOrDistrib = (A : Type) -> (B : Type) -> (C : Type) ->
+                     A /\ (B \/ C) => (A /\ B) \/ (A /\ C);;
+
+
+# 6. Negation
+
+
+define botElim = fun (A : Type) -> fun (bot : False) -> Absurd bot A;;
+check botElim = (A : Type) -> False => A;;
+
+define contr = fun (A : Type) -> fun (B : Type) ->
+               fun (a2b : A => B) ->
+               fun (nb : ~B) ->
+               fun (a : A) ->
+               nb (a2b a);;
+check contr = (A : Type) -> (B : Type) -> (A => B) => (~ B => ~ A);;
+
+
+define noContradict = fun (A : Type)->
+                      fun (x : A /\ ~ A) ->
+                      Proj1 x (Proj0 x);;
+check noContradict = (A : Type) -> ~ (A /\ ~ A);;
+
+define doubleNegIntro = fun (A : Type) ->
+                        fun (a : A) ->
+                        fun (na : ~ A) ->
+                        na a;;
+check doubleNegIntro = (A : Type) -> A => ~ ~ A;;
+
+define dneEmpty = fun (f : ~ ~ False) -> f (id False);;
+check dneEmpty = ~ ~ False => False;;
+
+define explode = fun (A : Type) -> fun (B : Type) ->
+                 fun (a : A) ->
+                 fun (na : ~ A) ->
+                 Absurd (na a) B;;
+check explode = (A : Type) -> (B : Type) -> A => ~ A => B;;
+
+
+define dmAnd = fun (A : Type) -> fun (B : Type) ->
+               fun (naANDnb : ~A /\ ~B) ->
+               fun (aORb : A \/ B) ->
+               Case aORb (fun (a : A) -> Proj0 naANDnb a)
+                         (fun (b : B) -> Proj1 naANDnb b);;
+check dmAnd = (A : Type) -> (B : Type) -> (~ A /\ ~ B) => ~ (A \/ B);;
+
+define dmAndConv = fun (A : Type) -> fun (B : Type) ->
+                   fun (notOR : ~ (A \/ B)) ->
+                       Pair (fun (a : A) -> notOR (Inj0 a B))
+                            (fun (b : B) -> notOR (Inj1 A b));;
+check dmAndConv = (A : Type) -> (B : Type) -> ~ (A \/ B) => (~ A /\ ~ B);;
+
+define dmOR = fun (A : Type) -> fun (B : Type) ->
+              fun (naORnb : ~ A \/ ~ B) ->
+              fun (aANDb : A /\ B) ->
+              Case naORnb (fun (na : ~ A) -> na (Proj0 aANDb))
+                          (fun (nb : ~ B) -> nb (Proj1 aANDb));;
+check dmOR = (A : Type) -> (B : Type) -> (~ A \/ ~ B) => ~ (A /\ B);;
+
+define dmOrConv = fun (A : Type) -> fun (B : Type) ->
+                  fun (f : ~ (A /\ B)) ->
+                  fun (g : ~ (~ A \/ ~ B)) ->
+                    g (Inj0
+                        (fun (x : A) ->
+                          g (Inj1 (~ A)
+                                  (fun (y : B) -> f (Pair x y))
+                            )
+                        )
+                        (~ B)
+                      );;
+check dmOrConv = (A : Type) -> (B : Type) -> ~ (A /\ B) => ~ ~ (~ A \/ ~ B);;
+
+
+define nnlem = fun (A : Type) ->
+               fun (f : ~ (A \/ ~ A)) ->
+                 f (Inj1 A
+                         (fun (x : A) -> f (Inj0 x (~ A)))
+                   );;
+check nnlem = (A : Type) -> ~ (~ (A \/ ~A));;
+
+
+define rp = fun (A : Type) ->
+            fun (f : A => ~ A) ->
+            fun (g : ~ A => A) ->
+              (fun (x : A) -> f x x)
+              (g (fun (x : A) -> f x x));;
+check rp = (A : Type) -> (A => ~ A) => (~ A => A) => False;;
+
+
+# 7. Truth
+
+define TrueIntro = fun (A : Type) ->
+                   fun (f : True => A) ->
+                     f Unit;;
+check TrueIntro = (A : Type) -> (True => A) => A;;
+
+define negTrue = fun (f : ~ True) -> f Unit;;
+check negTrue = ~ True => False;;
+
+define negTrueConv = fun (f : False) -> fun (t : True) -> f;;
+check negTrueConv = False => ~ True;;
+
+# 8. Classical logic (Skipped)
+
+
+# 9. First-Order Logic
+
+assume U : Type;;
+
+define swapA = fun (P : U => U => Type) ->
+               fun (f : ((x : U) -> (y : U) -> P x y)) ->
+                 fun (y : U) ->
+                 fun (x : U) ->
+                   f x y;;
+check swapA = (P : U => U => Type) ->
+                ((x : U) -> (y : U) -> P x y)
+                => ((y : U) -> (x : U) -> P x y);;
+
+
+exit;;

@@ -28,6 +28,19 @@ rule token = parse
   | "→"      { TO }
   | "=>"     { IMP }
   | "⇒"      { IMP }
+  | "/\\"    { AND }
+  | "Pair"   { PAIR }
+  | "Proj0"  { PROJ0 }
+  | "Proj1"  { PROJ1 }
+  | "\\/"    { OR }
+  | "Inj0"   { INJ0 }
+  | "Inj1"   { INJ1 }
+  | "Case"   { CASE }
+  | "~"      { NOT }
+  | "True"   { TRUE }
+  | "Unit"   { UNIT }
+  | "False"  { FALSE }
+  | "Absurd" { ABSURD }
   | (['A'-'Z''a'-'z''0'-'9']+ as s) { IDENT s }
   | space+ { token lexbuf }
   | '#'([^'#']*'\n') { token lexbuf }
