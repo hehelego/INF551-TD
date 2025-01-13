@@ -1,0 +1,66 @@
+define nondep_sigma_to_conj = Pi (A : Type) Pi (B : Type) Pi (x : Sigma (_ : A) B) A /\ B ;;
+define prod_to_conj = fun (A : Type) -> fun (B : Type) ->
+                      fun (x : Sigma (_ : A) B) ->
+                      And (Fst x) (Snd x) ;;
+
+check prod_to_conj = nondep_sigma_to_conj;;
+
+define conj_to_sigma_nondep = Pi (A : Type) Pi (B : Type) Pi (x : A /\ B) Sigma (_ : A) B ;;
+define conj_to_prod = fun (A : Type) -> fun (B : Type) ->
+                      fun (x : A /\ B) ->
+                      Pair (Proj0 x)
+                           (fun (a : A) -> B)
+                           (Proj1 x) ;;
+
+
+define ex_comm = fun (T : Type) -> fun (P : T => T => Type) ->
+                 fun (w : Sigma (p : T) Sigma (q : T) P p q) ->
+                 Pair (Fst (Snd w))
+                      (fun (y : T) -> Sigma (x : T) P x y)
+                      (Pair (Fst w)
+                            (fun (x : T) -> P x (Fst (Snd w)))
+                            (Snd (Snd w)));;
+
+define ex_comm_type = Pi (A : Type) Pi (R : A => A => Type)
+                      (Sigma (p : A) Sigma (q : A) R p q)
+                      => (Sigma (q : A) Sigma (p : A) R p q);;
+check ex_comm = ex_comm_type ;;
+
+
+define ex_conj_distr = fun (A : Type) -> fun (P : A => Type) -> fun (Q : A => Type) ->
+                       fun (t : Sigma (x : A) (P x /\ Q x)) ->
+                       And (Pair (Fst t) P (Proj0 (Snd t)))
+                           (Pair (Fst t) Q (Proj1 (Snd t))) ;;
+define ex_conj_distr_type = Pi (A : Type) Pi (P : A => Type) Pi (Q : A => Type)
+                            (Sigma (x : A) (P x /\ Q x)) => ((Sigma (x : A) P x) /\ (Sigma (x : A) Q x));;
+check ex_conj_distr = ex_conj_distr_type ;;
+
+define ex_disj_distr = fun (A : Type) -> fun (P : A => Type) -> fun (Q : A => Type) ->
+                       fun (t : Sigma (x : A) (P x \/ Q x)) ->
+                       Case (Snd t)
+                            (fun (p : P (Fst t)) -> Or0 (Pair (Fst t) P p)
+                                                        (Sigma (x : A) Q x))
+                            (fun (q : Q (Fst t)) -> Or1 (Pair (Fst t) Q q)
+                                                        (Sigma (x : A) P x)));;
+
+define ex_disj_distr_type = Pi (A : Type) Pi (P : A => Type) Pi (Q : A => Type)
+                            (Sigma (x : A) (P x \/ Q x)) => ((Sigma (x : A) P x) \/ (Sigma (x : A) Q x));;
+check ex_disj_distr = ex_disj_distr_type ;;
+
+
+define all_not_nex = fun (U : Type) -> fun (P : U => Type) -> fun (Q : U => Type) ->
+                     fun (f : Pi (x : U) ~ (P x)) ->
+                        fun (u : Sigma (x : U) P x) ->
+                            f (Fst u) (Snd u);;
+check all_not_nex = Pi (U : Type) Pi (P : U => Type) Pi (Q : U => Type)
+                    ((Pi (x : U) ~ (P x)) => ~ (Sigma (x : U) P x));;
+
+
+define ex_not_nall = fun (U : Type) -> fun (P : U => Type) -> fun (Q : U => Type) ->
+                     fun (u : Sigma (x : U) ~ (P x)) ->
+                        fun (f : Pi (x : U) P x) ->
+                            (Snd u) (f (Fst u));;
+check ex_not_nall = Pi (U : Type) Pi (P : U => Type) Pi (Q : U => Type)
+                    ((Sigma (x : U) ~ (P x)) => ~ (Pi (x : U) P x));;
+
+exit;;

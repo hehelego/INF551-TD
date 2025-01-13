@@ -80,7 +80,7 @@ let () =
           env := (x, (a, Some t)) :: !env;
           print_with_ctrl Green
             (x ^ " defined to " ^ to_string t ^ " of type " ^ to_string a)
-      | "context" -> print_with_ctrl Green (string_of_context !env)
+      | "context" -> print_with_ctrl Green (show_context !env)
       | "type" ->
           let t = of_string arg in
           let a = infer !env t in
@@ -109,7 +109,7 @@ let () =
     | Type_error err ->
         good := false;
         Printexc.print_backtrace stderr;
-        print_with_ctrl Red ("Typing error :" ^ err ^ ".")
+        print_with_ctrl Red ("Typing error :" ^ show_typing_error err ^ ".")
     | Parsing.Parse_error ->
         good := false;
         print_with_ctrl Red "Parsing error."

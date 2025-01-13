@@ -3,23 +3,24 @@ open Expr
 %}
 
 %token IMP
-%token OR
-%token AND
-%token NOT
-%token INJ0 INJ1 CASE
-%token PAIR PROJ0 PROJ1
+%token OR0 OR1 CASE
+%token PAIR FST SND
 %token TRUE FALSE UNIT ABSURD
-%token PI TYPE NAT Z S IND EQ REFL J
+%token PI SIGMA
+%token TYPE
+%token NAT Z S IND
+%token EQ REFL J
+%token LIST NIL CONS REC
 %token TO FUN
+%token NOT CONJ DISJ AND OR PROJ0 PROJ1
 %token LPAR RPAR COLON COMMA
 %token <string> IDENT
 %token EOF
 
 %nonassoc EQ
 %right IMP
-%left OR
-%left AND
-%right NOT
+%left CONJ
+%left DISJ
 
 %start expr
 %type <Expr.expr> expr
@@ -27,7 +28,7 @@ open Expr
 
 /* Precedences:
     (highest)
-    !
+    ~
     =
     /\
     \/
@@ -38,29 +39,31 @@ open Expr
 /* An expression */
 expr:
   | implexpr                               { $1 }
-  | PI LPAR IDENT COLON expr RPAR TO expr  { Pi ($3, $5, $8) }
+  | PI LPAR IDENT COLON expr RPAR expr     { Pi ($3, $5, $7) }
   | LPAR IDENT COLON expr RPAR TO expr     { Pi ($2, $4, $7) }
+  | SIGMA LPAR IDENT COLON expr RPAR expr  { Sigma ($3, $5, $7) }
+  | LIST expr                              { List $2 }
   | FUN LPAR IDENT COLON expr RPAR TO expr { Abs ($3, $5, $8) }
 
 /* a binary expression whose top level operator is logical-implication */
 implexpr:
   | orexpr                                 { $1 }
-  | orexpr IMP implexpr                    { Pi ("_", $1, $3) }
+  | orexpr IMP implexpr                    { impl $1 $3 }
 
 /* a binary expression whose top level operator is logical-or */
 orexpr:
   | andexpr                                { $1 }
-  | orexpr OR andexpr                     { Disj ($1, $3) }
+  | andexpr DISJ orexpr                    { Disj ($1, $3) }
 
 /* a binary expression whose top level operator is logical-and */
 andexpr:
   | eqexpr                                 { $1 }
-  | andexpr AND eqexpr                      { Conj ($1, $3) }
+  | eqexpr CONJ andexpr                    { Conj ($1, $3) }
 
 /* a binary expression whose top level operator is equality */
 eqexpr:
   | aexpr                                  { $1 }
-  | aexpr EQ aexpr                         { Eq ($1, $3) }
+  | aexpr EQ eqexpr                        { Eq ($1, $3) }
 
 /* An application */
 aexpr:
@@ -80,17 +83,25 @@ sexpr:
   (* equality *)
   | REFL sexpr                             { Refl $2 }
   | J sexpr sexpr sexpr sexpr sexpr        { J ($2, $3, $4, $5, $6) }
-  (* conjunction *)
-  | PAIR sexpr sexpr                       { Pair ($2, $3) }
-  | PROJ0 sexpr                            { Proj0 $2 }
-  | PROJ1 sexpr                            { Proj1 $2 }
-  (* disjunction *)
-  | INJ0 sexpr sexpr                       { Inj0 ($2, $3) }
-  | INJ1 sexpr sexpr                       { Inj1 ($2, $3) }
-  | CASE sexpr sexpr sexpr                 { Case ($2, $3, $4) }
   (* true/false and negation *)
   | TRUE                                   { True }
   | FALSE                                  { False }
   | UNIT                                   { Unit }
   | ABSURD sexpr sexpr                     { Absurd ($2, $3) }
-  | NOT sexpr                              { Pi ("_", $2, False) }
+  | NOT sexpr                              { neg $2 }
+  (* coproduct *)
+  | PAIR sexpr sexpr sexpr                 { Pair ($2, $3, $4) }
+  | FST sexpr                              { Fst $2 }
+  | SND sexpr                              { Snd $2 }
+  (* list *)
+  | NIL sexpr                              { Nil $2 }
+  | CONS sexpr sexpr                       { Cons ($2, $3) }
+  | REC sexpr sexpr sexpr sexpr            { Rec ($2, $3, $4, $5) }
+  (* logical connectives and/or *)
+  | AND sexpr sexpr                        { And ($2, $3) }
+  | PROJ0 sexpr                            { Proj0 $2 }
+  | PROJ1 sexpr                            { Proj1 $2 }
+  | OR0 sexpr sexpr                        { Or0 ($2, $3) }
+  | OR1 sexpr sexpr                        { Or1 ($2, $3) }
+  | CASE sexpr sexpr sexpr                 { Case ($2, $3, $4) }
+

@@ -5,7 +5,7 @@
 define andComm = fun (A : Type) ->
                  fun (B : Type) ->
                  fun (x : A /\ B) ->
-                 Pair (Proj1 x) (Proj0 x);;
+                 And (Proj1 x) (Proj0 x);;
 
 
 check andComm = (A : Type) -> (B : Type) -> A /\ B => B /\ A;;
@@ -52,16 +52,16 @@ check s = (A : Type) -> (B : Type) -> (C : Type) ->
 
 define fst = fun (A : Type) -> fun (B : Type) -> fun (x : A /\ B) -> Proj0 x;;
 define snd = fun (A : Type) -> fun (B : Type) -> fun (x : A /\ B) -> Proj1 x;;
-check Pair fst snd = ((A : Type) -> (B : Type) -> A /\ B => A)
+check And fst snd = ((A : Type) -> (B : Type) -> A /\ B => A)
                      /\ ((A : Type) -> (B : Type) -> A /\ B => B);;
 
-define diag = fun (A : Type) -> fun (x : A) -> Pair x x;;
+define diag = fun (A : Type) -> fun (x : A) -> And x x;;
 check diag = (A : Type) -> A => A /\ A;;
 
 define curry = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
                fun (f : A /\ B => C) ->
                fun (x : A) -> fun (y : B) ->
-               f (Pair x y);;
+               f (And x y);;
 check curry = (A : Type) -> (B : Type) -> (C : Type) ->
               (A /\ B => C) => A => B => C;;
 
@@ -76,13 +76,13 @@ define equiv = fun (A : Type) -> fun (B : Type) -> (A => B) /\ (B => A);;
 check equiv = Type => Type => Type;;
 
 define currying = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
-                  Pair (curry A B C) (uncurry A B C);;
+                  And (curry A B C) (uncurry A B C);;
 check currying = (A : Type) -> (B : Type) -> (C : Type) ->
                  equiv (A /\ B => C) (A => B => C);;
 
 define ImpAndDistrib = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
                        fun (f : A => B /\ C) ->
-                       Pair (fun (x : A) -> fst B C (f x))
+                       And (fun (x : A) -> fst B C (f x))
                             (fun (x : A) -> snd B C (f x));;
 check ImpAndDistrib = (A : Type) -> (B : Type) -> (C : Type) ->
                       (A => B /\ C) => (A => B) /\ (A => C);;
@@ -98,18 +98,17 @@ check orElim = (A : Type) -> (B : Type) -> (C : Type) ->
 
 define orComm = fun (A : Type) -> fun (B : Type) ->
                 fun (xy : A \/ B) ->
-                Case xy (fun (x : A) -> Inj1 B x)
-                        (fun (y : B) -> Inj0 y A);;
+                Case xy (fun (x : A) -> Or1 x B)
+                        (fun (y : B) -> Or0 y A);;
 check orComm = (A : Type) -> (B : Type) -> A \/ B => B \/ A;;
 
 define AndOrDistrib = fun (A : Type) -> fun (B : Type) -> fun (C : Type) ->
                       fun (aBC : A /\ (B \/ C)) ->
                       Case (Proj1 aBC)
-                        (fun (b : B) -> Inj0 (Pair (Proj0 aBC) b) (A /\ C))
-                        (fun (c : C) -> Inj1 (A /\ B) (Pair (Proj0 aBC) c));;
+                        (fun (b : B) -> Or0 (And (Proj0 aBC) b) (A /\ C))
+                        (fun (c : C) -> Or1 (And (Proj0 aBC) c) (A /\ B)) ;;
 check AndOrDistrib = (A : Type) -> (B : Type) -> (C : Type) ->
                      A /\ (B \/ C) => (A /\ B) \/ (A /\ C);;
-
 
 # 6. Negation
 
@@ -145,6 +144,7 @@ define explode = fun (A : Type) -> fun (B : Type) ->
                  Absurd (na a) B;;
 check explode = (A : Type) -> (B : Type) -> A => ~ A => B;;
 
+exit;;
 
 define dmAnd = fun (A : Type) -> fun (B : Type) ->
                fun (naANDnb : ~A /\ ~B) ->
@@ -153,10 +153,12 @@ define dmAnd = fun (A : Type) -> fun (B : Type) ->
                          (fun (b : B) -> Proj1 naANDnb b);;
 check dmAnd = (A : Type) -> (B : Type) -> (~ A /\ ~ B) => ~ (A \/ B);;
 
+exit;;
+
 define dmAndConv = fun (A : Type) -> fun (B : Type) ->
                    fun (notOR : ~ (A \/ B)) ->
-                       Pair (fun (a : A) -> notOR (Inj0 a B))
-                            (fun (b : B) -> notOR (Inj1 A b));;
+                       And (fun (a : A) -> notOR (Or0 a B))
+                           (fun (b : B) -> notOR (Or1 b A));;
 check dmAndConv = (A : Type) -> (B : Type) -> ~ (A \/ B) => (~ A /\ ~ B);;
 
 define dmOR = fun (A : Type) -> fun (B : Type) ->
@@ -169,21 +171,17 @@ check dmOR = (A : Type) -> (B : Type) -> (~ A \/ ~ B) => ~ (A /\ B);;
 define dmOrConv = fun (A : Type) -> fun (B : Type) ->
                   fun (f : ~ (A /\ B)) ->
                   fun (g : ~ (~ A \/ ~ B)) ->
-                    g (Inj0
-                        (fun (x : A) ->
-                          g (Inj1 (~ A)
-                                  (fun (y : B) -> f (Pair x y))
-                            )
-                        )
-                        (~ B)
-                      );;
+                    g (Or0 (fun (x : A) ->
+                              g (Or1 (fun (y : B) -> f (And x y))
+                                     (~ A)))
+                           (~ B));;
 check dmOrConv = (A : Type) -> (B : Type) -> ~ (A /\ B) => ~ ~ (~ A \/ ~ B);;
 
 
 define nnlem = fun (A : Type) ->
                fun (f : ~ (A \/ ~ A)) ->
-                 f (Inj1 A
-                         (fun (x : A) -> f (Inj0 x (~ A)))
+                 f (Or1 (fun (x : A) -> f (Or0 x ~A))
+                        A
                    );;
 check nnlem = (A : Type) -> ~ (~ (A \/ ~A));;
 

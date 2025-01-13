@@ -32,10 +32,10 @@ eval mul (S (S (S Z))) (S (S Z)) ;;
 define SeqPred = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> S x = S y ;;
 define sxEQsx = fun (x : Nat) -> Refl (S x) ;;
 define Seq = fun (x : Nat) -> fun (y : Nat) -> fun (eq : x = y) -> J SeqPred sxEQsx x y eq ;;
-check Seq = Pi (x : Nat) -> Pi (y : Nat) -> Pi (e : x = y) -> S x = S y ;;
+check Seq = Pi (x : Nat) Pi (y : Nat) Pi (e : x = y) S x = S y ;;
 
-define congType = Pi (T : Type) -> Pi (U : Type) -> Pi (f : T => U) ->
-                  Pi (x : T) -> Pi (y : T) -> x = y => f x = f y;;
+define congType = Pi (T : Type) Pi (U : Type) Pi (f : T => U)
+                  Pi (x : T) Pi (y : T) x = y => f x = f y;;
 define cong = fun (T : Type) -> fun (U : Type) -> fun (f : T => U)
            -> fun (x : T) -> fun (y : T) -> fun (eq : x = y)
            -> J
@@ -46,24 +46,24 @@ define cong = fun (T : Type) -> fun (U : Type) -> fun (f : T => U)
                  eq;;
 check cong = congType;;
 define congSuc = cong Nat Nat suc;;
-check congSuc = Pi (m : Nat) -> Pi (n : Nat) -> Pi (e : m = n) -> S m = S n;;
+check congSuc = Pi (m : Nat) Pi (n : Nat) Pi (e : m = n) S m = S n;;
 
-define transType = Pi (T : Type) ->
-                     Pi (x : T) -> Pi (y : T) -> Pi (z : T) ->
-                       Pi (xy : x = y) -> Pi (yz : y = z) ->
+define transType = Pi (T : Type)
+                     Pi (x : T) Pi (y : T) Pi (z : T)
+                       Pi (xy : x = y) Pi (yz : y = z)
                          x = z;;
 define trans = fun (T : Type) ->
                  fun (x : T) -> fun (y : T) -> fun (z : T) ->
                    fun (xy : x = y) -> fun (yz : y = z) ->
                      (J
-                       (fun (s : T) -> fun (t : T) -> fun (e : s = t) -> t = z -> s = z)
+                       (fun (s : T) -> fun (t : T) -> fun (e : s = t) -> t = z => s = z)
                        (fun (t : T) -> fun (e : t = z) -> e)
                        x y xy) yz;;
 check trans = transType;;
 
-define symType = Pi (T : Type) ->
-                   Pi (x : T) -> Pi (y : T) ->
-                     Pi (e : x = y) ->
+define symType = Pi (T : Type)
+                   Pi (x : T) Pi (y : T)
+                     Pi (e : x = y)
                        y = x;;
 define sym = fun (T : Type) ->
                fun (x : T) -> fun (y : T) ->
@@ -77,7 +77,7 @@ check sym = symType;;
 
 # 0 is left/right netural element of addition
 define zadd = fun (n : Nat) -> Refl n;;
-check zadd =  Pi (n : Nat) -> (add Z n = n);;
+check zadd =  Pi (n : Nat) add Z n = n;;
 define addz = fun (n : Nat) ->
                 Ind
                   (fun (n : Nat) -> add n Z = n)
@@ -85,18 +85,17 @@ define addz = fun (n : Nat) ->
                   (fun (n : Nat) -> fun (ih : add n Z = n) ->
                     congSuc (add n Z) n ih)
                   n;;
-check addz =  Pi (n : Nat) -> (add n Z = n);;
+check addz =  Pi (n : Nat) add n Z = n ;;
 
 # add-assoc, add-comm
-define addAssocType = Pi (x : Nat) -> Pi (y : Nat) -> Pi (z : Nat) ->
+define addAssocType = Pi (x : Nat) Pi (y : Nat) Pi (z : Nat)
                       add (add x y) z = add x (add y z);;
-define addAssocPred = fun (x : Nat) -> Pi (y : Nat) -> Pi (z : Nat) ->
-                      add (add x y) z = add x (add y z);;
+define addAssocPred = fun (x : Nat) ->
+                      Pi (y : Nat) Pi (z : Nat) add (add x y) z = add x (add y z);;
 check addAssocPred = Nat => Type;;
 
-
 define addAssocBase = (fun (y : Nat) -> fun (z : Nat) -> Refl (add y z)) ;;
-check addAssocBase = Pi (y : Nat) -> Pi (z : Nat) -> add (add Z y) z = add Z (add y z);;
+check addAssocBase = Pi (y : Nat) Pi (z : Nat) add (add Z y) z = add Z (add y z);;
 check addAssocBase = addAssocPred Z ;;
 
 define addAssocStep = fun (x : Nat) -> 
@@ -107,12 +106,12 @@ define addAssocStep = fun (x : Nat) ->
                              (add x (add y z))
                              # get the proof of (x + y) + z = x + (y + z)
                              (IH y z) ;;
-check addAssocStep = Pi (x : Nat) -> Pi (IH : addAssocPred x) -> addAssocPred (S x);;
+check addAssocStep = Pi (x : Nat) Pi (IH : addAssocPred x) addAssocPred (S x);;
+
 
 define addAssoc = fun (x : Nat) -> Ind addAssocPred addAssocBase addAssocStep x ;;
 type addAssoc ;;
 check addAssoc = addAssocType ;;
-
 
 define addSucThm = fun (m : Nat) ->
                      fun (n : Nat) ->
@@ -123,12 +122,14 @@ define addSucThm = fun (m : Nat) ->
                             congSuc (add t (suc n)) (suc (add t n)) IH
                          )
                          m;;
-check addSucThm = Pi (m : Nat) -> Pi (n : Nat) -> add m (suc n) = suc (add m n);;
+check addSucThm = Pi (m : Nat) Pi (n : Nat) add m (suc n) = suc (add m n);;
 
 define addCommTerm = fun (x : Nat) -> fun (y : Nat) -> add x y = add y x;;
 check addCommTerm = Nat => Nat => Type;;
-define addCommType = Pi (x : Nat) -> Pi (y : Nat) -> addCommTerm x y;;
+define addCommType = Pi (x : Nat) Pi (y : Nat) addCommTerm x y;;
 check addCommType = Type;;
+
+
 
 define addComm = fun (x : Nat) -> fun (y : Nat) ->
                    Ind
@@ -175,8 +176,8 @@ define distribute = fun (m : N) -> fun (n : N) -> fun (p : N) ->
                         )
                         m ;;
 
-check distribute = Pi (m : N) -> Pi (n : N) -> Pi (p : N) ->
-                     mul (add m n) p = add (mul m p) (mul n p);;
+check distribute = Pi (m : N) Pi (n : N) Pi (p : N)
+                   mul (add m n) p = add (mul m p) (mul n p);;
 
 define mulAssoc = fun (m : N) -> fun (n : N) -> fun (p : N) ->
                     Ind
@@ -199,8 +200,10 @@ define mulAssoc = fun (m : N) -> fun (n : N) -> fun (p : N) ->
                              IH)
                       )
                       m;;
-check mulAssoc = Pi (m : N) -> Pi (n : N) -> Pi (p : N) ->
-                   mul (mul m n) p = mul m (mul n p);;
+check mulAssoc = Pi (m : N) Pi (n : N) Pi (p : N)
+                 mul (mul m n) p = mul m (mul n p);;
+
+
 
 define mulZ = fun (n : N) ->
                 Ind
@@ -211,7 +214,7 @@ define mulZ = fun (n : N) ->
                        Z (mul n Z)
                        IH)
                   n;;
-check mulZ = Pi (n : N) -> Z = mul n Z;;
+check mulZ = Pi (n : N) Z = mul n Z;;
 
 define I = S Z;;
 
@@ -222,7 +225,7 @@ define mulIr = fun (n : N) ->
                       congSuc n (mul n I) IH
                    )
                    n;;
-check mulIr = Pi (m : N) -> m = mul m I;;
+check mulIr = Pi (m : N) m = mul m I;;
 
 define mulS = fun (m : N) -> fun (p : N) ->
                 Ind (fun (m : N) -> mul m (S p) = add (mul m I) (mul m p))
@@ -263,14 +266,12 @@ define mulS = fun (m : N) -> fun (p : N) ->
                             (addAssoc (mul m I) p (mul m p)))))
                   )
                   m;;
-check mulS = Pi (m : N) -> Pi (p : N) ->
-               mul m (S p) = add (mul m I) (mul m p);;
+check mulS = Pi (m : N) Pi (p : N) mul m (S p) = add (mul m I) (mul m p);;
 define symMulS = fun (m : N) -> fun (p : N) ->
                     sym N
                       (mul m (S p)) (add (mul m I) (mul m p))
                       (mulS m p);;
-check symMulS = Pi (m : N) -> Pi (p : N) ->
-                  add (mul m I) (mul m p) = mul m (S p);;
+check symMulS = Pi (m : N) Pi (p : N) add (mul m I) (mul m p) = mul m (S p);;
 
 define mulComm = fun (m : N) -> fun (n : N) ->
                    Ind
@@ -297,6 +298,6 @@ define mulComm = fun (m : N) -> fun (n : N) ->
                           )
                      )
                      m;;
-check mulComm = Pi (m : N) -> Pi (n : N) ->
+check mulComm = Pi (m : N) Pi (n : N)
                    mul m n = mul n m;;
 exit;;

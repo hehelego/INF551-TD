@@ -28,20 +28,28 @@ rule token = parse
   | "→"      { TO }
   | "=>"     { IMP }
   | "⇒"      { IMP }
-  | "/\\"    { AND }
+  | "Sigma"  { SIGMA }
   | "Pair"   { PAIR }
-  | "Proj0"  { PROJ0 }
-  | "Proj1"  { PROJ1 }
-  | "\\/"    { OR }
-  | "Inj0"   { INJ0 }
-  | "Inj1"   { INJ1 }
-  | "Case"   { CASE }
-  | "~"      { NOT }
+  | "Fst"    { FST }
+  | "Snd"    { SND }
+  | "List"   { LIST }
+  | "Nil"    { NIL }
+  | "Cons"   { CONS }
+  | "Rec"    { REC }
   | "True"   { TRUE }
   | "Unit"   { UNIT }
   | "False"  { FALSE }
   | "Absurd" { ABSURD }
-  | (['A'-'Z''a'-'z''0'-'9']+ as s) { IDENT s }
+  | "~"      { NOT }
+  | "/\\"    { CONJ }
+  | "\\/"    { DISJ }
+  | "And"    { AND }
+  | "Proj0"  { PROJ0 }
+  | "Proj1"  { PROJ1 }
+  | "Or0"    { OR0 }
+  | "Or1"    { OR1 }
+  | "Case"   { CASE }
+  | (['A'-'Z''a'-'z''0'-'9''_']+ as s) { IDENT s }
   | space+ { token lexbuf }
   | '#'([^'#']*'\n') { token lexbuf }
   | "\n" { new_line lexbuf; token lexbuf }
