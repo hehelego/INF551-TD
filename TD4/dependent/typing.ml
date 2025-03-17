@@ -137,7 +137,7 @@ let rec subst (x : var) (tm : expr) : expr -> expr = function
       let nil' = subst x tm nil in
       let cons' = subst x tm cons in
       let l' = subst x tm l in
-      Ind (p', nil', cons', l')
+      Rec (p', nil', cons', l')
       (* logical connectives *)
   | Conj (a, b) ->
       let a' = subst x tm a in
@@ -306,10 +306,10 @@ let rec reduce (ctx : context) (e : expr) : expr option =
       let ih = Rec (p, nil, cons, l) in
       Some (App (App (App (cons, x), l), ih))
   | Rec (p, nil, cons, l) ->
-      let* () = reduce ctx p >> fun p' -> Ind (p', nil, cons, l) in
-      let* () = reduce ctx nil >> fun nil' -> Ind (p, nil', cons, l) in
-      let* () = reduce ctx cons >> fun cons' -> Ind (p, nil, cons', l) in
-      reduce ctx l >> fun l' -> Ind (p, nil, cons, l')
+      let* () = reduce ctx p >> fun p' -> Rec (p', nil, cons, l) in
+      let* () = reduce ctx nil >> fun nil' -> Rec (p, nil', cons, l) in
+      let* () = reduce ctx cons >> fun cons' -> Rec (p, nil, cons', l) in
+      reduce ctx l >> fun l' -> Rec (p, nil, cons, l')
   (* logical connectives *)
   | Conj (a, b) ->
       let* () = reduce ctx a >> fun a' -> Conj (a', b) in

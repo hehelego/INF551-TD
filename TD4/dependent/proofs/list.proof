@@ -1,0 +1,53 @@
+assume T : Type;;
+
+define option = T \/ True;;
+define some = fun (x : T) -> Or0 x True;;
+define none = Or1 Unit T;;
+
+check option = Type;;
+check some = Pi (x : T) option;;
+check none = option;;
+
+define congS = fun (n : Nat) -> fun (m : Nat) -> fun (eq : n = m) ->
+               J (fun (n : Nat) -> fun (m : Nat) -> fun (eq : n = m) -> S n = S m)
+                 (fun (n : Nat) -> Refl (S n))
+                 n m eq ;;
+check congS = Pi (n : Nat) Pi (m : Nat) (n = m => S n = S m);;
+
+define list_len = fun (l : List T) ->
+                      Rec (fun (_ : List T) -> Nat)
+                          Z
+                          (fun (_ : T) -> fun (_ : List T) -> fun (n : Nat) -> S n)
+                          l;;
+check list_len = List T => Nat;;
+
+define len_cons_suc = fun (x : T) -> fun (l : List T) ->
+                      Rec (fun (l : List T) -> list_len (Cons x l) = S (list_len l))
+                          (Refl (S Z))
+                          (fun (y : T) ->
+                               fun (l : List T) ->
+                                   fun (IH : list_len (Cons x l) = S (list_len l)) ->
+                                       congS (list_len (Cons x l)) (S (list_len l)) IH)
+                          l;;
+check len_cons_suc = Pi (x : T) Pi (l : List T) list_len (Cons x l) = S (list_len l);;
+
+define list_hd = fun (l : List T) ->
+                 Rec (fun (_ : List T) -> option)
+                     (none)
+                     (fun (x : T) ->
+                          fun (_ : List T) ->
+                              fun (_ : option) -> some x)
+                     l;;
+check list_hd = Pi (l : List T) option;;
+
+define list_hd_cons = fun (x : T) -> fun (l : List T) ->
+                      Rec (fun (l : List T) -> list_hd (Cons x l) = some x)
+                          (Refl (some x))
+                          (fun (y : T) ->
+                               fun (l : List T) ->
+                                   fun (ih : list_hd (Cons x (Cons y l)) = some x) ->
+                                       Refl (some x))
+                          l;;
+check list_hd_cons = Pi (x : T) Pi (l : List T) list_hd (Cons x l) = some x;;
+
+exit;;

@@ -42,7 +42,6 @@ expr:
   | PI LPAR IDENT COLON expr RPAR expr     { Pi ($3, $5, $7) }
   | LPAR IDENT COLON expr RPAR TO expr     { Pi ($2, $4, $7) }
   | SIGMA LPAR IDENT COLON expr RPAR expr  { Sigma ($3, $5, $7) }
-  | LIST expr                              { List $2 }
   | FUN LPAR IDENT COLON expr RPAR TO expr { Abs ($3, $5, $8) }
 
 /* a binary expression whose top level operator is logical-implication */
@@ -94,6 +93,7 @@ sexpr:
   | FST sexpr                              { Fst $2 }
   | SND sexpr                              { Snd $2 }
   (* list *)
+  | LIST sexpr                             { List $2 }
   | NIL sexpr                              { Nil $2 }
   | CONS sexpr sexpr                       { Cons ($2, $3) }
   | REC sexpr sexpr sexpr sexpr            { Rec ($2, $3, $4, $5) }
