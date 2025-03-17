@@ -1,10 +1,55 @@
--- tested on
--- agda 2.6.3
--- agda-stdlib 2.1
-import Relation.Binary.PropositionalEquality as Eq
-open Eq using (_≡_; refl; cong; sym)
-open Eq.≡-Reasoning using (begin_; step-≡-∣; step-≡-⟩; _∎)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
+data ℕ : Set where
+  zero : ℕ
+  suc  : ℕ → ℕ
+{-# BUILTIN NATURAL ℕ #-}
+
+infixr 20 _+_
+_+_ : ℕ → ℕ → ℕ
+zero + n = n
+(suc m) + n = suc (m + n)
+
+infixr 30 _*_
+_*_ : ℕ → ℕ → ℕ
+zero * n = zero
+(suc m) * n = n + m * n
+
+infix 10 _≡_
+data _≡_ {A : Set} : A → A → Set where
+  refl : {x : A} → x ≡ x
+
+sym : {A : Set} {x y : A} → x ≡ y → y ≡ x
+sym refl = refl
+
+trans : {A : Set} {x y z : A} → x ≡ y → y ≡ z → x ≡ z
+trans refl refl = refl
+
+cong : {A B : Set} (f : A → B) {x y : A} → x ≡ y → f x ≡ f y
+cong f refl = refl
+
+-- Credit: Authors of the PLFA book
+-- Url: https://plfa.github.io/Equality/
+module ≡-Reasoning {A : Set} where
+
+  infix  1 begin_
+  infixr 2 step-≡-∣ step-≡-⟩
+  infix  3 _∎
+
+  begin_ : ∀ {x y : A} → x ≡ y → x ≡ y
+  begin x≡y  =  x≡y
+
+  step-≡-∣ : ∀ (x : A) {y : A} → x ≡ y → x ≡ y
+  step-≡-∣ x x≡y  =  x≡y
+
+  step-≡-⟩ : ∀ (x : A) {y z : A} → y ≡ z → x ≡ y → x ≡ z
+  step-≡-⟩ x y≡z x≡y  =  trans x≡y y≡z
+
+  syntax step-≡-∣ x x≡y      =  x ≡⟨⟩ x≡y
+  syntax step-≡-⟩ x y≡z x≡y  =  x ≡⟨  x≡y ⟩ y≡z
+
+  _∎ : ∀ (x : A) → x ≡ x
+  x ∎  =  refl
+
+open ≡-Reasoning
 
 
 +-assoc : ∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)
@@ -30,22 +75,16 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
 +-suc zero n = refl
 +-suc (suc m) n = cong suc (+-suc m n)
 
-trans : (x y z : ℕ) → x ≡ y → y ≡ z → x ≡ z
-trans x y z refl refl = refl
-
 +-comm : ∀ (m n : ℕ) → m + n ≡ n + m
 +-comm m zero = +-identityʳ m
 +-comm m (suc n) =
   trans
-    -- operators
-    (m + suc n) (suc m + n) (suc n + m)
-    -- equalities
     (+-suc m n)
     (cong suc (+-comm m n))
 
 *-distrib-+ : ∀ (m n p : ℕ) → (m + n) * p ≡ m * p + n * p
 *-distrib-+ zero n p = refl
-*-distrib-+ (suc m) n p = Eq.trans
+*-distrib-+ (suc m) n p = trans
   (cong (p +_) (*-distrib-+ m n p))
   (sym (+-assoc p (m * p) (n * p)))
 
@@ -53,7 +92,7 @@ trans x y z refl refl = refl
 *-assoc : (m n p : ℕ) → (m * n) * p ≡ m * (n * p)
 *-assoc zero n p = refl
 *-assoc (suc m) n p = let IH = *-assoc m n p in
-  Eq.trans
+  trans
     (*-distrib-+ n (m * n) p)
     (cong (n * p +_) IH)
 
