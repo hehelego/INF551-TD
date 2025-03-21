@@ -29,9 +29,8 @@ elim P h (tree root sub) = h root sub (λ x → elim P h (sub x))
 data 𝟘 : Set where
 
 -- singleton
--- defined as a record because the eta-expansion definitional equality is needed
-record 𝟙 : Set where
-  constructor *
+data 𝟙 : Set where
+  * : 𝟙
 
 -- binary/boolean
 data 𝟚 : Set where
@@ -53,14 +52,40 @@ zero = tree 0₂ λ ()
 suc : Nat → Nat
 suc n = tree 1₂ (λ * → n)
 
--- the [base] takes a parameter of type [𝟘 → Nat] this is because
--- we cannot prove that all elements of type [𝟘 → Nat] are equal.
-Ind : (P : Nat → Set)
-    → (base : (empty : 𝟘 → Nat) → P (tree 0₂ empty))
-    → (step : (n : Nat) (IH : P n) → P (suc n))
-    → (n : Nat)
-    → P n
-Ind P base step (tree 0₂ empty) = base empty
-Ind P base step (tree 1₂ sub) = let n  = sub *
-                                    IH = Ind P base step n
-                                 in step n IH
+-- an example of using the [Nat] type defined by W.
+add : Nat → Nat → Nat
+add = elim (λ _ → Nat → Nat) λ { 0₂ sub IH → (λ x → x)
+                               ; 1₂ sub IH → (λ x → suc (IH * x)) }
+
+
+data nat-equality : Nat → Nat → Set where
+  reflexivity : (n : Nat) → nat-equality n n
+
+w0 = zero
+w1 = suc w0
+w2 = suc w1
+w3 = suc w2
+w4 = suc w3
+w5 = suc w4
+
+add00 = reflexivity w0
+add01 = reflexivity w1
+add02 = reflexivity w2
+add03 = reflexivity w3
+add04 = reflexivity w4
+add05 = reflexivity w5
+add10 = reflexivity w1
+add11 = reflexivity w2
+add12 = reflexivity w3
+add13 = reflexivity w4
+add14 = reflexivity w5
+add20 = reflexivity w2
+add21 = reflexivity w3
+add22 = reflexivity w4
+add23 = reflexivity w5
+add30 = reflexivity w3
+add31 = reflexivity w4
+add32 = reflexivity w5
+add40 = reflexivity w4
+add41 = reflexivity w5
+add50 = reflexivity w5
